@@ -411,8 +411,7 @@
             flex-direction: column;
             transition: opacity 0.3s;
         }
-        .map-float-modal .map-container,
-        .map-float-modal #dashboardMap {
+        .map-float-modal .map-float-map {
             width: 100vw !important;
             height: 100vh !important;
             min-height: 100vh !important;
@@ -425,7 +424,7 @@
         .map-float-modal .leaflet-control-attribution {
             display: none !important;
         }
-        .map-float-modal .map-float-exit-btn {
+        .map-float-exit-btn {
             position: fixed;
             top: 16px;
             right: 16px;
@@ -434,12 +433,12 @@
             color: #fff;
             border: none;
             border-radius: 50%;
-            width: 44px;
-            height: 44px;
+            width: 48px;
+            height: 48px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: 2rem;
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
             cursor: pointer;
         }
@@ -1831,7 +1830,7 @@
                     // Detecta móvil por user agent o tamaño de pantalla
                     const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent) || window.innerWidth <= 800;
                     if (isMobile) {
-                        expandDashboardMapMobile();
+                        openMapFloatModal();
                         return;
                     }
                     // Desktop: pantalla completa real
@@ -2985,39 +2984,28 @@
             const modal = document.createElement('div');
             modal.id = 'map-float-modal';
             modal.className = 'map-float-modal';
-            // Clonar el mapa y controles principales
-            const dashboardSection = document.getElementById('dashboard-section');
-            const mapBlock = dashboardSection.querySelector('.bg-white, .dark\\:bg-secondary-800');
-            // Clonar solo el bloque del mapa
-            const mapClone = mapBlock.cloneNode(true);
-            // Limpiar IDs duplicados
-            mapClone.id = '';
-            mapClone.querySelector('#dashboardMap').id = 'dashboardMapFloat';
+            // Contenedor para el mapa
+            const mapDiv = document.createElement('div');
+            mapDiv.id = 'dashboardMapFloat';
+            mapDiv.className = 'map-float-map';
+            modal.appendChild(mapDiv);
             // Botón de cerrar
             const exitBtn = document.createElement('button');
             exitBtn.className = 'map-float-exit-btn';
             exitBtn.innerHTML = '<i class="ti ti-x"></i>';
             exitBtn.onclick = () => {
+                if (AppState.maps.dashboardMapFloat) {
+                    AppState.maps.dashboardMapFloat.remove();
+                    AppState.maps.dashboardMapFloat = null;
+                }
                 modal.remove();
-                // Restaurar el mapa original
-                setTimeout(() => {
-                    if (AppState.maps.dashboardMap) {
-                        AppState.maps.dashboardMap.invalidateSize();
-                    }
-                }, 300);
             };
-            modal.appendChild(mapClone);
             modal.appendChild(exitBtn);
             document.body.appendChild(modal);
             // Inicializar un nuevo mapa en el modal
             setTimeout(() => {
                 const mapEl = document.getElementById('dashboardMapFloat');
                 if (mapEl) {
-                    // Destruir mapa anterior si existe
-                    if (AppState.maps.dashboardMapFloat) {
-                        AppState.maps.dashboardMapFloat.remove();
-                        AppState.maps.dashboardMapFloat = null;
-                    }
                     // Crear nuevo mapa
                     AppState.maps.dashboardMapFloat = L.map(mapEl, {
                         zoomControl: false,
