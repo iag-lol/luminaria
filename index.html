@@ -367,6 +367,119 @@
         .fullscreen-map-active .leaflet-control-attribution {
             display: none !important;
         }
+        .fullscreen-exit-btn {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 11000;
+            background: rgba(0,0,0,0.7);
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            cursor: pointer;
+        }
+        /* MODAL DE DETALLE SIEMPRE ARRIBA */
+        #detail-modal, #detail-modal .modal-overlay, #detail-modal .modal-content {
+            z-index: 12000 !important;
+        }
+        @media (max-width: 600px) {
+            .fullscreen-map-active {
+                padding: 0 !important;
+            }
+        }
+        /* ... estilos existentes ... */
+        .map-float-modal {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 13000 !important;
+            background: #fff;
+            border-radius: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+            display: flex !important;
+            flex-direction: column;
+            transition: opacity 0.3s;
+        }
+        .map-float-modal .map-container,
+        .map-float-modal #dashboardMap {
+            width: 100vw !important;
+            height: 100vh !important;
+            min-height: 100vh !important;
+            min-width: 100vw !important;
+            position: absolute !important;
+            top: 0; left: 0;
+            z-index: 13001;
+            border-radius: 0 !important;
+        }
+        .map-float-modal .leaflet-control-attribution {
+            display: none !important;
+        }
+        .map-float-modal .map-float-exit-btn {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 13010;
+            background: rgba(0,0,0,0.7);
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            cursor: pointer;
+        }
+        @media (max-width: 600px) {
+            .map-float-modal {
+                padding: 0 !important;
+            }
+        }
+        /* ... estilos existentes ... */
+        .dashboard-map-expanded {
+            height: 80vh !important;
+            min-height: 320px !important;
+            max-height: 100vh !important;
+            transition: height 0.3s;
+            position: relative;
+            z-index: 10;
+        }
+        .dashboard-map-exit-btn {
+            display: none;
+        }
+        @media (max-width: 600px) {
+            .dashboard-map-exit-btn {
+                display: flex !important;
+                position: absolute;
+                top: 12px;
+                right: 12px;
+                z-index: 20;
+                background: rgba(0,0,0,0.7);
+                color: #fff;
+                border: none;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.3rem;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                cursor: pointer;
+            }
+        }
     </style>
     <!-- Favicon para evitar error 404 -->
     <link rel="icon" href="data:,">
@@ -1715,23 +1828,35 @@
             const fullscreenBtn = document.getElementById('dashboard-fullscreen-btn');
             if (fullscreenBtn) {
                 fullscreenBtn.onclick = () => {
-                    // Usar el contenedor padre del mapa para pantalla completa
+                    // Detecta móvil por user agent o tamaño de pantalla
+                    const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent) || window.innerWidth <= 800;
+                    if (isMobile) {
+                        expandDashboardMapMobile();
+                        return;
+                    }
+                    // Desktop: pantalla completa real
                     const mapContainer = mapEl.parentElement;
-                    if (!document.fullscreenElement) {
-                        (mapContainer || mapEl).requestFullscreen?.();
-                    } else {
-                        document.exitFullscreen?.();
+                    const requestFullscreen = mapContainer.requestFullscreen || mapContainer.webkitRequestFullscreen || mapContainer.msRequestFullscreen;
+                    const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+                    if (requestFullscreen) {
+                        if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
+                            requestFullscreen.call(mapContainer);
+                        } else {
+                            exitFullscreen && exitFullscreen.call(document);
+                        }
                     }
                 };
             }
-
             // Manejar entrada/salida de pantalla completa para ajustar estilos
             function handleFullscreenChange() {
                 const mapContainer = document.getElementById('dashboardMap')?.parentElement;
-                if (document.fullscreenElement && mapContainer) {
-                    mapContainer.classList.add('fullscreen-map-active');
-                } else if (mapContainer) {
+                // Si salimos de fullscreen real, quitar la clase y el botón
+                if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement && mapContainer) {
                     mapContainer.classList.remove('fullscreen-map-active');
+                    const btn = document.getElementById('fullscreen-exit-btn');
+                    if (btn) btn.remove();
+                } else if ((document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement) && mapContainer) {
+                    mapContainer.classList.add('fullscreen-map-active');
                 }
                 setTimeout(() => {
                     if (AppState.maps.dashboardMap) {
@@ -1741,6 +1866,10 @@
             }
             document.removeEventListener('fullscreenchange', handleFullscreenChange);
             document.addEventListener('fullscreenchange', handleFullscreenChange);
+            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+            document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+            document.removeEventListener('msfullscreenchange', handleFullscreenChange);
+            document.addEventListener('msfullscreenchange', handleFullscreenChange);
 
             updateDashboardMapMarkers();
         }
@@ -2847,6 +2976,151 @@
             document.getElementById('nav-dashboard').addEventListener('click', () => switchView('dashboard'));
             document.getElementById('nav-form').addEventListener('click', () => switchView('form'));
         });
+
+        // --- MODAL FLOTANTE PARA MAPA EN MÓVIL ---
+        function openMapFloatModal() {
+            // Si ya existe, no crear de nuevo
+            if (document.getElementById('map-float-modal')) return;
+            // Crear modal
+            const modal = document.createElement('div');
+            modal.id = 'map-float-modal';
+            modal.className = 'map-float-modal';
+            // Clonar el mapa y controles principales
+            const dashboardSection = document.getElementById('dashboard-section');
+            const mapBlock = dashboardSection.querySelector('.bg-white, .dark\\:bg-secondary-800');
+            // Clonar solo el bloque del mapa
+            const mapClone = mapBlock.cloneNode(true);
+            // Limpiar IDs duplicados
+            mapClone.id = '';
+            mapClone.querySelector('#dashboardMap').id = 'dashboardMapFloat';
+            // Botón de cerrar
+            const exitBtn = document.createElement('button');
+            exitBtn.className = 'map-float-exit-btn';
+            exitBtn.innerHTML = '<i class="ti ti-x"></i>';
+            exitBtn.onclick = () => {
+                modal.remove();
+                // Restaurar el mapa original
+                setTimeout(() => {
+                    if (AppState.maps.dashboardMap) {
+                        AppState.maps.dashboardMap.invalidateSize();
+                    }
+                }, 300);
+            };
+            modal.appendChild(mapClone);
+            modal.appendChild(exitBtn);
+            document.body.appendChild(modal);
+            // Inicializar un nuevo mapa en el modal
+            setTimeout(() => {
+                const mapEl = document.getElementById('dashboardMapFloat');
+                if (mapEl) {
+                    // Destruir mapa anterior si existe
+                    if (AppState.maps.dashboardMapFloat) {
+                        AppState.maps.dashboardMapFloat.remove();
+                        AppState.maps.dashboardMapFloat = null;
+                    }
+                    // Crear nuevo mapa
+                    AppState.maps.dashboardMapFloat = L.map(mapEl, {
+                        zoomControl: false,
+                        attributionControl: false
+                    }).setView(DEFAULT_COORDS, 11);
+                    // Añadir controles de zoom
+                    L.control.zoom({ position: 'topright' }).addTo(AppState.maps.dashboardMapFloat);
+                    // Añadir capa de mapa
+                    L.tileLayer(MAP_TILES[AppState.mapStyle].url, { maxZoom: 19 }).addTo(AppState.maps.dashboardMapFloat);
+                    // Añadir marcadores de terminales
+                    Object.entries(TERMINALES).forEach(([name, coords]) => {
+                        const icon = L.divIcon({
+                            html: `<i class='ti ti-building-broadcast text-lg text-primary-700 dark:text-primary-400'></i>`,
+                            className: 'bg-white dark:bg-secondary-800 shadow-md rounded-full w-8 h-8 flex items-center justify-center border-2 border-primary-500 dark:border-primary-700',
+                            iconSize: [32, 32],
+                            iconAnchor: [16, 16]
+                        });
+                        L.marker(coords, { icon }).addTo(AppState.maps.dashboardMapFloat)
+                            .bindTooltip(name, { permanent: false, direction: 'top', className: 'bg-white dark:bg-secondary-800 text-secondary-900 dark:text-white shadow-md border-0 rounded px-2 py-1 text-xs' });
+                    });
+                    // Añadir marcadores de inspecciones
+                    AppState.filteredInspections.filter(i => i.latitude && i.longitude).forEach(inspection => {
+                        let markerColor;
+                        switch (inspection.estado) {
+                            case 'Bueno': markerColor = 'green'; break;
+                            case 'Mal direccionado': case 'Falla intermitente': markerColor = 'orange'; break;
+                            case 'Corte eléctrico': case 'Apagado': case 'Dañado': markerColor = 'red'; break;
+                            case 'En mantenimiento': markerColor = 'blue'; break;
+                            default: markerColor = 'gray';
+                        }
+                        const icon = L.divIcon({
+                            html: `<div class='flex items-center justify-center w-full h-full rounded-full bg-${markerColor}-100 dark:bg-${markerColor}-900/30 border-2 border-${markerColor}-500'><i class='ti ti-bulb text-${markerColor}-600 dark:text-${markerColor}-400'></i></div>`,
+                            className: 'custom-div-icon',
+                            iconSize: [28, 28],
+                            iconAnchor: [14, 14]
+                        });
+                        const marker = L.marker([inspection.latitude, inspection.longitude], { icon });
+                        marker.bindPopup(`
+                            <div class='text-xs'>
+                                <div class='font-bold mb-1'>${inspection.terminal || 'Terminal no especificado'}</div>
+                                <div>${inspection.tipo_poste || 'Tipo no especificado'}</div>
+                                <div class='my-1'>Estado: <span class='font-semibold text-${markerColor}-600'>${inspection.estado || 'No especificado'}</span></div>
+                                <div class='text-secondary-500'>${new Date(inspection.created_at).toLocaleString('es-CL', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
+                                <button class='view-detail-btn mt-2 text-primary-600 hover:text-primary-800 text-center w-full' data-id='${inspection.id}'>Ver detalles</button>
+                            </div>
+                        `);
+                        marker.on('popupopen', () => {
+                            setTimeout(() => {
+                                const btn = document.querySelector(`.view-detail-btn[data-id='${inspection.id}']`);
+                                if (btn) {
+                                    btn.addEventListener('click', () => {
+                                        showDetailModal(inspection);
+                                    });
+                                }
+                            }, 10);
+                        });
+                        marker.addTo(AppState.maps.dashboardMapFloat);
+                    });
+                    // Ubicación actual del usuario
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(pos => {
+                            const coords = [pos.coords.latitude, pos.coords.longitude];
+                            const userIcon = L.divIcon({
+                                html: `<div class='flex items-center justify-center w-7 h-7 rounded-full bg-blue-500 border-4 border-white shadow-lg'><i class='ti ti-navigation text-white'></i></div>`,
+                                className: '',
+                                iconSize: [28, 28],
+                                iconAnchor: [14, 14]
+                            });
+                            L.marker(coords, { icon: userIcon, zIndexOffset: 1000 }).addTo(AppState.maps.dashboardMapFloat).bindTooltip('Tu ubicación', { direction: 'top', className: 'bg-white dark:bg-secondary-800 text-secondary-900 dark:text-white shadow-md border-0 rounded px-2 py-1 text-xs' });
+                        });
+                    }
+                }
+            }, 100);
+        }
+
+        // --- EXPANSIÓN DEL MAPA EN MÓVIL ---
+        function expandDashboardMapMobile() {
+            const mapBlock = document.getElementById('dashboardMap').parentElement;
+            mapBlock.classList.add('dashboard-map-expanded');
+            // Elimina cualquier botón de cerrar previo para evitar duplicados
+            let oldExitBtn = document.getElementById('dashboard-map-exit-btn');
+            if (oldExitBtn) oldExitBtn.remove();
+            // Botón de cerrar
+            const exitBtn = document.createElement('button');
+            exitBtn.id = 'dashboard-map-exit-btn';
+            exitBtn.className = 'dashboard-map-exit-btn';
+            exitBtn.innerHTML = '<i class="ti ti-x"></i>';
+            exitBtn.onclick = () => {
+                mapBlock.classList.remove('dashboard-map-expanded');
+                exitBtn.remove();
+                setTimeout(() => {
+                    if (AppState.maps.dashboardMap) {
+                        AppState.maps.dashboardMap.invalidateSize();
+                    }
+                }, 300);
+            };
+            mapBlock.appendChild(exitBtn);
+            setTimeout(() => {
+                if (AppState.maps.dashboardMap) {
+                    AppState.maps.dashboardMap.invalidateSize();
+                }
+            }, 350);
+        }
     </script>
 </body>
 </html>
