@@ -554,6 +554,10 @@
         const SUPABASE_URL = 'https://tcmtxvuucjttngcazgff.supabase.co'; 
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRjbXR4dnV1Y2p0dG5nY2F6Z2ZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA3MjUwMDEsImV4cCI6MjA1NjMwMTAwMX0.2WcIjMUEhSM6j9kYpbsYArQocZdHx86k7wXk-NyjIs0';
         
+        // --- SOLUCIÓN: Crear el cliente de Supabase global para todo el archivo ---
+        const { createClient } = supabase;
+        const dbClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
         /* ESTRUCTURA DE TABLA 'levantamiento_luminaria' RECOMENDADA:
          * id (int8, PK), created_at (timestamptz), terminal (text), tipo_poste (text),
          * estado (text), observacion (text), latitude (float8), longitude (float8), image_url (text)
@@ -2637,10 +2641,6 @@
                     });
                     return;
                 }
-                
-                // Crear cliente de Supabase
-                const { createClient } = supabase;
-                const dbClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
                 
                 // Consultar datos
                 const { data, error } = await dbClient.from('levantamiento_luminaria').select('*').order('created_at', { ascending: false });
