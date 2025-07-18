@@ -3,381 +3,2766 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inspección de Luminarias del Terminal</title>
+    <title>Sistema de Gestión de Luminarias</title>
+    
+    <!-- Fuentes -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Manrope', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                            950: '#082f49',
+                        },
+                        secondary: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                            950: '#020617',
+                        },
+                        success: {
+                            light: '#d1fae5',
+                            DEFAULT: '#10b981',
+                            dark: '#065f46',
+                        },
+                        warning: {
+                            light: '#fef3c7',
+                            DEFAULT: '#f59e0b',
+                            dark: '#92400e',
+                        },
+                        danger: {
+                            light: '#fee2e2',
+                            DEFAULT: '#ef4444',
+                            dark: '#991b1b',
+                        },
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
     
-    <!-- Leaflet CSS (para el mapa) -->
+    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     
+    <!-- Leaflet MarkerCluster -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Iconos -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.34.0/tabler-icons.min.css" />
+    
+    <!-- FileSaver.js para exportación -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <!-- SheetJS para exportación Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
     <!-- Estilos personalizados -->
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
+        /* Variables globales */
+        :root {
+            --map-height-desktop: 550px;
+            --map-height-mobile: 350px;
+            --form-map-height: 280px;
+            --detail-map-height: 250px;
+            --animation-duration: 0.3s;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
-        #map { 
-            height: 400px; 
+
+        /* Estilos generales */
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            scroll-behavior: smooth;
+        }
+        
+        .dark {
+            color-scheme: dark;
+        }
+        
+        .font-display {
+            font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+        }
+        
+        .grid-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 1rem;
+        }
+        
+        /* Mapas */
+        .map-container {
+            position: relative;
             width: 100%;
-            border-radius: 0.5rem;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
             z-index: 10;
         }
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
+        
+        #dashboardMap {
+            height: var(--map-height-mobile);
+        }
+        
+        #formMap {
+            height: var(--form-map-height);
+        }
+        
+        #detailMap {
+            height: var(--detail-map-height);
+        }
+        
+        @media (min-width: 768px) {
+            #dashboardMap {
+                height: var(--map-height-desktop);
+            }
+        }
+        
+        /* Gráficos */
+        .chart-container {
+            position: relative;
+            height: 250px;
+        }
+        
+        /* Navegación */
+        .nav-link {
+            position: relative;
+            cursor: pointer;
+            transition: all var(--animation-duration) ease;
+        }
+        
+        .nav-link:after {
+            content: "";
+            position: absolute;
+            bottom: -1px;
+            left: 50%;
+            width: 0;
+            height: 2px;
+            background-color: currentColor;
+            transition: all var(--animation-duration) ease;
+            transform: translateX(-50%);
+        }
+        
+        .nav-link.active:after {
+            width: 100%;
+        }
+        
+        /* Animaciones y transiciones */
+        .fade-enter {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        
+        .fade-enter-active {
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity var(--animation-duration) ease,
+                        transform var(--animation-duration) ease;
+        }
+        
+        .modal-overlay {
+            transition: opacity var(--animation-duration) ease;
+        }
+        
+        .modal-content {
+            transition: transform var(--animation-duration) ease, 
+                        opacity var(--animation-duration) ease;
+        }
+        
+        /* Componentes */
+        .spinner {
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            border-top: 3px solid currentColor;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 1.5rem;
+            height: 1.5rem;
             animation: spin 1s linear infinite;
         }
+        
+        .dark .spinner {
+            border-color: rgba(255, 255, 255, 0.1);
+            border-top-color: currentColor;
+        }
+        
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        .progress-ring {
+            transition: stroke-dashoffset 0.35s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        
+        /* Utilidades */
         .hidden {
+            display: none !important;
+        }
+        
+        .truncate-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .no-scrollbar::-webkit-scrollbar {
             display: none;
         }
+        
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        /* Efectos de hover */
+        .hover-scale {
+            transition: transform 0.2s ease;
+        }
+        
+        .hover-scale:hover {
+            transform: scale(1.02);
+        }
+        
+        /* Ajustes para modo oscuro */
+        .dark .leaflet-tile {
+            filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
+        }
+        
+        .dark .leaflet-container {
+            background: #303030;
+        }
+        
+        /* Mejoras visuales para leaflet */
+        .custom-cluster-icon {
+            background-color: rgba(14, 165, 233, 0.7);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.3);
+        }
+        
+        .leaflet-tooltip {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            box-shadow: var(--shadow-sm);
+        }
+        
+        /* Estilos para la carga inicial */
+        .app-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: white;
+            z-index: 9999;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+        
+        .dark .app-loader {
+            background-color: #1e293b;
+            color: white;
+        }
+        
+        .loading-logo {
+            animation: pulse-logo 2s infinite;
+        }
+        
+        @keyframes pulse-logo {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: var(--shadow-md);
+            transform: translateY(150%);
+            transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+            z-index: 1000;
+            max-width: 90%;
+        }
+        
+        .toast.show {
+            transform: translateY(0);
+        }
     </style>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body class="bg-gray-50 dark:bg-secondary-900 dark:text-gray-100 transition-colors duration-200">
 
-    <!-- MENSAJE DE CONFIGURACIÓN REQUERIDA -->
-    <div id="config-warning" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-4 m-4 rounded-md" role="alert">
-        <p class="font-bold">¡Acción Requerida!</p>
-        <p>Debes configurar tus credenciales de Supabase en el archivo HTML para que la aplicación funcione. Edita el código y reemplaza los valores de `SUPABASE_URL` y `SUPABASE_ANON_KEY`.</p>
+    <!-- Loader inicial -->
+    <div id="app-loader" class="app-loader">
+        <div class="loading-logo mb-4">
+            <div class="text-primary-600 dark:text-primary-400 text-4xl mb-2">
+                <i class="ti ti-bulb"></i>
+            </div>
+        </div>
+        <div class="flex flex-col items-center">
+            <h2 class="text-xl font-display font-semibold mb-2">Sistema de Gestión de Luminarias</h2>
+            <div class="spinner text-primary-500"></div>
+        </div>
     </div>
 
-    <div id="app-content" class="container mx-auto p-4 md:p-8 max-w-4xl">
-        <header class="text-center mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Inspección de Luminarias</h1>
-            <p class="text-gray-600 mt-2">Registra el estado de las luminarias del terminal.</p>
+    <!-- Mensaje de configuración requerida -->
+    <div id="config-warning" class="hidden fixed inset-0 flex items-center justify-center p-4 bg-black bg-opacity-50 z-50">
+        <div class="bg-white dark:bg-secondary-800 rounded-xl shadow-lg p-6 max-w-md w-full">
+            <div class="flex items-center mb-4 text-danger-dark dark:text-danger-light">
+                <i class="ti ti-alert-triangle text-2xl mr-2"></i>
+                <h3 class="text-xl font-semibold">¡Acción Requerida!</h3>
+            </div>
+            <p class="mb-4">Debes configurar tus credenciales de Supabase en el archivo HTML para que la aplicación funcione correctamente.</p>
+            <div class="bg-secondary-50 dark:bg-secondary-700 p-3 rounded-md text-sm font-mono mb-4 overflow-x-auto">
+                <p>// Líneas 231-232: Actualiza estos valores</p>
+                <p>const SUPABASE_URL = 'TU_PROYECTO_URL';</p>
+                <p>const SUPABASE_ANON_KEY = 'TU_CLAVE_ANONIMA';</p>
+            </div>
+            <div class="flex justify-end">
+                <button id="close-config-warning" class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors">Entendido</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Contenedor principal de la aplicación -->
+    <div id="app-container" class="hidden">
+        <!-- Header con navegación -->
+        <header class="bg-white dark:bg-secondary-800 shadow-sm sticky top-0 z-40 transition-colors duration-200">
+            <div class="container mx-auto px-4">
+                <div class="flex items-center justify-between h-16">
+                    <!-- Logo y título -->
+                    <div class="flex items-center space-x-3">
+                        <span class="text-primary-600 dark:text-primary-400 text-xl">
+                            <i class="ti ti-bulb"></i>
+                        </span>
+                        <h1 class="text-lg font-display font-semibold text-primary-700 dark:text-primary-300">Sistema de Gestión de Luminarias</h1>
+                    </div>
+                    
+                    <!-- Navegación -->
+                    <div class="flex items-center space-x-1 sm:space-x-4">
+                        <a id="nav-dashboard" class="nav-link text-secondary-600 dark:text-secondary-300 hover:text-primary-600 dark:hover:text-primary-400 px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium border-b-2 border-transparent active">
+                            <i class="ti ti-dashboard-2 hidden sm:inline-block mr-1"></i>Dashboard
+                        </a>
+                        <a id="nav-form" class="nav-link text-secondary-600 dark:text-secondary-300 hover:text-primary-600 dark:hover:text-primary-400 px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium border-b-2 border-transparent">
+                            <i class="ti ti-clipboard-plus hidden sm:inline-block mr-1"></i>Formulario
+                        </a>
+                        <button id="theme-toggle" class="ml-2 p-1 rounded-full text-secondary-400 hover:text-primary-600 dark:text-secondary-400 dark:hover:text-primary-400 focus:outline-none">
+                            <i class="ti ti-sun dark:hidden text-lg"></i>
+                            <i class="ti ti-moon hidden dark:inline text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </header>
 
-        <main class="bg-white p-6 rounded-xl shadow-lg">
-            <form id="inspectionForm" class="space-y-6">
-                
-                <div>
-                    <label for="luminaireId" class="block text-sm font-medium text-gray-700">Identificador del Poste / Luminaria</label>
-                    <input type="text" id="luminaireId" name="luminaireId" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                </div>
+        <!-- Contenido principal -->
+        <main class="container mx-auto px-4 py-4 transition-all duration-200">
+            <!-- Sección Dashboard -->
+            <section id="dashboard-section" class="fade-enter"></section>
 
-                <div>
-                    <label for="status" class="block text-sm font-medium text-gray-700">Estado</label>
-                    <select id="status" name="status" required class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                        <option value="Bueno">Bueno</option>
-                        <option value="Dañado">Dañado</option>
-                        <option value="Mantenimiento">Requiere Mantenimiento</option>
-                    </select>
-                </div>
-
-                <div id="imageUploadContainer" class="hidden">
-                    <label for="imageFile" class="block text-sm font-medium text-gray-700">Subir Imagen (si está dañada)</label>
-                    <input type="file" id="imageFile" name="imageFile" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
-                </div>
-
-                <div>
-                    <label for="notes" class="block text-sm font-medium text-gray-700">Notas Adicionales</label>
-                    <textarea id="notes" name="notes" rows="3" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Ubicación del Daño</label>
-                    <p class="text-xs text-gray-500 mb-2">Tu ubicación se actualiza en tiempo real. Si necesitas ajustar la posición final, arrastra el pin azul al lugar exacto.</p>
-                    <div id="map"></div>
-                    <input type="hidden" id="latitude" name="latitude">
-                    <input type="hidden" id="longitude" name="longitude">
-                </div>
-
-                <div class="text-right">
-                    <button type="submit" id="submitButton" class="inline-flex justify-center items-center py-2 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        <span id="buttonText">Enviar Reporte</span>
-                        <div id="loader" class="loader hidden ml-3"></div>
-                    </button>
-                </div>
-            </form>
+            <!-- Sección Formulario -->
+            <section id="form-section" class="hidden fade-enter"></section>
         </main>
+        
+        <!-- Footer -->
+        <footer class="mt-auto py-4 bg-white dark:bg-secondary-800 border-t border-gray-200 dark:border-secondary-700 text-xs text-center text-secondary-500 dark:text-secondary-400 transition-colors duration-200">
+            <div class="container mx-auto px-4">
+                <p>Sistema de Gestión de Luminarias © <span id="current-year"></span></p>
+            </div>
+        </footer>
     </div>
 
-    <!-- Modal para mensajes -->
-    <div id="messageModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div class="mt-3 text-center">
-                <div id="modalIcon" class="mx-auto flex items-center justify-center h-12 w-12 rounded-full"></div>
-                <h3 id="modalTitle" class="text-lg leading-6 font-medium text-gray-900"></h3>
-                <div class="mt-2 px-7 py-3">
-                    <p id="modalMessage" class="text-sm text-gray-500"></p>
+    <!-- Modal de detalle de reporte -->
+    <div id="detail-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay bg-black bg-opacity-50 hidden opacity-0 transition-opacity">
+        <div class="bg-white dark:bg-secondary-800 rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto modal-content transform scale-95 transition-all opacity-0">
+            <div class="p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 class="text-xl font-display font-semibold text-secondary-900 dark:text-white">Detalle de la Inspección</h3>
+                    <button id="close-modal-btn" class="text-secondary-400 hover:text-secondary-600 dark:text-secondary-400 dark:hover:text-secondary-200 transition text-2xl leading-none focus:outline-none">
+                        <i class="ti ti-x"></i>
+                    </button>
                 </div>
-                <div class="items-center px-4 py-3">
-                    <button id="closeModalButton" class="px-4 py-2 bg-indigo-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-300">Cerrar</button>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-secondary-100 dark:bg-secondary-700 rounded-lg overflow-hidden">
+                        <div class="relative w-full h-64">
+                            <img id="detail-image" src="" alt="Imagen de la luminaria" class="w-full h-full object-cover">
+                            <div id="detail-no-image" class="absolute inset-0 flex flex-col items-center justify-center bg-secondary-200 dark:bg-secondary-700 text-secondary-400 dark:text-secondary-500 hidden">
+                                <i class="ti ti-photo-off text-4xl mb-2"></i>
+                                <span class="text-sm">Sin imagen disponible</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <h4 class="text-xs font-bold text-secondary-500 dark:text-secondary-400 uppercase tracking-wider mb-2">Resumen</h4>
+                            <div id="detail-summary" class="space-y-2 text-sm"></div>
+                        </div>
+                        <div>
+                            <h4 class="text-xs font-bold text-secondary-500 dark:text-secondary-400 uppercase tracking-wider mb-2">
+                                <span>Ubicación</span>
+                                <button id="detail-open-maps" class="ml-2 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 text-xs hidden">
+                                    <i class="ti ti-external-link text-xs"></i> Abrir en Maps
+                                </button>
+                            </h4>
+                            <div id="detailMap" class="w-full rounded-lg map-container"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button id="detail-export-btn" class="px-3 py-1.5 bg-secondary-100 dark:bg-secondary-700 text-secondary-700 dark:text-secondary-200 rounded-md text-xs hover:bg-secondary-200 dark:hover:bg-secondary-600 transition-colors flex items-center">
+                        <i class="ti ti-file-export mr-1.5"></i> Exportar
+                    </button>
+                    <button id="close-detail-btn" class="px-3 py-1.5 bg-primary-600 text-white rounded-md text-xs hover:bg-primary-700 transition-colors flex items-center">
+                        <i class="ti ti-x mr-1.5"></i> Cerrar
+                    </button>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Leaflet JS (para el mapa) -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     
-    <!-- Supabase JS Client -->
+    <!-- Modal de configuración -->
+    <div id="settings-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay bg-black bg-opacity-50 hidden opacity-0 transition-opacity">
+        <div class="bg-white dark:bg-secondary-800 rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto modal-content transform scale-95 transition-all opacity-0">
+            <div class="p-6">
+                <div class="flex justify-between items-start mb-6">
+                    <h3 class="text-xl font-display font-semibold text-secondary-900 dark:text-white">Configuración</h3>
+                    <button id="close-settings-modal-btn" class="text-secondary-400 hover:text-secondary-600 dark:text-secondary-400 dark:hover:text-secondary-200 transition text-2xl leading-none focus:outline-none">
+                        <i class="ti ti-x"></i>
+                    </button>
+                </div>
+                <div class="space-y-6">
+                    <div>
+                        <h4 class="text-sm font-semibold mb-3">Apariencia</h4>
+                        <div class="flex items-center space-x-4">
+                            <button id="theme-light" class="p-2 rounded-lg border-2 border-transparent text-center flex-1 hover:bg-secondary-100 dark:hover:bg-secondary-700 transition-colors">
+                                <i class="ti ti-sun text-lg mb-1 block mx-auto"></i>
+                                <span class="text-xs block">Claro</span>
+                            </button>
+                            <button id="theme-dark" class="p-2 rounded-lg border-2 border-transparent text-center flex-1 hover:bg-secondary-100 dark:hover:bg-secondary-700 transition-colors">
+                                <i class="ti ti-moon text-lg mb-1 block mx-auto"></i>
+                                <span class="text-xs block">Oscuro</span>
+                            </button>
+                            <button id="theme-system" class="p-2 rounded-lg border-2 border-transparent text-center flex-1 hover:bg-secondary-100 dark:hover:bg-secondary-700 transition-colors">
+                                <i class="ti ti-device-laptop text-lg mb-1 block mx-auto"></i>
+                                <span class="text-xs block">Sistema</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-semibold mb-3">Mapa</h4>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="text-xs font-medium text-secondary-700 dark:text-secondary-300 flex items-center justify-between">
+                                    <span>Estilo del mapa</span>
+                                    <select id="map-style" class="ml-2 text-xs py-1 px-2 pr-8 rounded-md border border-secondary-300 dark:border-secondary-600 bg-white dark:bg-secondary-700 focus:outline-none focus:ring-1 focus:ring-primary-500">
+                                        <option value="satellite">Satélite</option>
+                                        <option value="streets">Calles</option>
+                                        <option value="topo">Topográfico</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div>
+                                <label class="text-xs font-medium text-secondary-700 dark:text-secondary-300 flex items-center">
+                                    <input type="checkbox" id="map-cluster" class="mr-2 h-4 w-4 text-primary-600 rounded border-secondary-300 dark:border-secondary-600 focus:ring-primary-500">
+                                    <span>Agrupar marcadores cercanos</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-semibold mb-3">Datos</h4>
+                        <div class="space-y-3">
+                            <button id="export-data-btn" class="w-full px-3 py-2 bg-secondary-100 dark:bg-secondary-700 text-secondary-700 dark:text-secondary-200 rounded-md text-xs hover:bg-secondary-200 dark:hover:bg-secondary-600 transition-colors flex items-center justify-center">
+                                <i class="ti ti-file-export mr-1.5"></i> Exportar todos los datos
+                            </button>
+                            <button id="reset-filters-btn" class="w-full px-3 py-2 bg-secondary-100 dark:bg-secondary-700 text-secondary-700 dark:text-secondary-200 rounded-md text-xs hover:bg-secondary-200 dark:hover:bg-secondary-600 transition-colors flex items-center justify-center">
+                                <i class="ti ti-filter-off mr-1.5"></i> Restablecer filtros
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast de notificación -->
+    <div id="toast" class="toast bg-white dark:bg-secondary-800 text-secondary-900 dark:text-white shadow-lg hidden">
+        <div class="flex items-center">
+            <div id="toast-icon" class="flex-shrink-0 mr-3 text-lg"></div>
+            <div class="flex-1">
+                <p id="toast-message" class="text-sm"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Frameworks y librerías JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <script type="module">
-        // --- CONFIGURACIÓN DE SUPABASE ---
-        // IMPORTANTE: Reemplaza con los datos de tu proyecto Supabase.
-        // Puedes encontrarlos en tu panel de Supabase > Project Settings > API.
+    <script>
+        // Configuración de Supabase
         const SUPABASE_URL = 'https://tcmtxvuucjttngcazgff.supabase.co'; 
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRjbXR4dnV1Y2p0dG5nY2F6Z2ZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA3MjUwMDEsImV4cCI6MjA1NjMwMTAwMX0.2WcIjMUEhSM6j9kYpbsYArQocZdHx86k7wXk-NyjIs0';
-
-        const configWarning = document.getElementById('config-warning');
-        const appContent = document.getElementById('app-content');
-
-        // --- VERIFICACIÓN INICIAL ---
-        if (SUPABASE_URL.includes('TU_PROYECTO_URL') || SUPABASE_ANON_KEY.includes('TU_SUPABASE_ANON_KEY')) {
-            configWarning.classList.remove('hidden');
-            appContent.classList.add('hidden');
-            // Detiene la ejecución si no está configurado
-            throw new Error("Supabase no está configurado. Por favor, edita el script y añade tus credenciales.");
-        }
-
-        // --- INICIALIZACIÓN DE LA APP (SOLO SI LA CONFIGURACIÓN ES CORRECTA) ---
-        const { createClient } = supabase;
-        const dbClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
-        // --- ELEMENTOS DEL DOM ---
-        const form = document.getElementById('inspectionForm');
-        const statusSelect = document.getElementById('status');
-        const imageUploadContainer = document.getElementById('imageUploadContainer');
-        const imageFileInput = document.getElementById('imageFile');
-        const latInput = document.getElementById('latitude');
-        const lonInput = document.getElementById('longitude');
-        const submitButton = document.getElementById('submitButton');
-        const buttonText = document.getElementById('buttonText');
-        const loader = document.getElementById('loader');
+        /* ESTRUCTURA DE TABLA 'levantamiento_luminaria' RECOMENDADA:
+         * id (int8, PK), created_at (timestamptz), terminal (text), tipo_poste (text),
+         * estado (text), observacion (text), latitude (float8), longitude (float8), image_url (text)
+        */
 
-        // --- LÓGICA DEL MAPA (LEAFLET) ---
-        let map;
-        let userMarker;
-        let reportMarkers = {}; // Objeto para guardar los marcadores de reportes existentes
-        let isMapInitialized = false;
-        const defaultCoords = [-33.4489, -70.6693]; 
+        // Verificación inicial
+        const configWarning = document.getElementById('config-warning');
+        const appContainer = document.getElementById('app-container');
+        const appLoader = document.getElementById('app-loader');
+        
+        // Configuración de la aplicación
+        document.getElementById('current-year').textContent = new Date().getFullYear();
+        
+        // Estado global de la aplicación
+        const AppState = {
+            currentView: 'dashboard',
+            inspections: [],
+            filteredInspections: [],
+            charts: {},
+            maps: {},
+            mapStyle: 'satellite',
+            useCluster: true,
+            filters: {
+                terminal: 'all',
+                estado: 'all',
+                tipo_poste: 'all',
+                dateRange: {
+                    start: null,
+                    end: null
+                }
+            },
+            currentLocation: null
+        };
+        
+        // Constantes para la aplicación
+        const TERMINALES = {
+            "El Roble": [-33.44071, -70.78973], 
+            "La Reina": [-33.46484, -70.53179],
+            "Maria Angelica": [-33.51772, -70.55641], 
+            "El Descanso": [-33.46951, -70.76243]
+        };
+        const DEFAULT_COORDS = [-33.45694, -70.64827]; // Santiago centro
 
-        function initializeMap(coords) {
-            map = L.map('map').setView(coords, 18);
-            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                attribution: 'Tiles &copy; Esri'
-            }).addTo(map);
-
-            userMarker = L.marker(coords, { draggable: true }).addTo(map);
+        const TIPO_POSTES = [
+            "Poste Alto de Iluminación Vial",
+            "Poste Bajo de Iluminación Peatonal",
+            "Poste de Alumbrado Público",
+            "Poste con Múltiples Luminarias",
+            "Poste Decorativo"
+        ];
+        
+        const ESTADOS = [
+            "Bueno",
+            "Mal direccionado",
+            "Corte eléctrico",
+            "Apagado",
+            "Falla intermitente",
+            "Dañado",
+            "En mantenimiento"
+        ];
+        
+        const MAP_TILES = {
+            'satellite': {
+                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+            },
+            'streets': {
+                url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            },
+            'topo': {
+                url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+                attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>'
+            }
+        };
+        
+        // Templates HTML
+        const dashboardTemplate = `
+            <div id="data-consistency-warning" class="hidden bg-warning-light dark:bg-warning-dark/30 border-l-4 border-warning text-warning-dark dark:text-warning-light p-4 mb-6 rounded-md transition-colors duration-200" role="alert">
+                <div class="flex items-center">
+                    <i class="ti ti-alert-triangle text-xl mr-2"></i>
+                    <div>
+                        <p class="font-semibold">Advertencia de datos</p>
+                        <p class="text-sm">Se detectaron registros con campos incompletos. Esto puede afectar la visualización de datos.</p>
+                    </div>
+                </div>
+            </div>
             
-            latInput.value = coords[0];
-            lonInput.value = coords[1];
-
-            userMarker.on('dragend', function(event) {
-                const position = event.target.getLatLng();
-                latInput.value = position.lat;
-                lonInput.value = position.lng;
+            <!-- Header del dashboard -->
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 space-y-4 md:space-y-0">
+                <div>
+                    <h2 class="text-xl font-display font-semibold text-secondary-900 dark:text-white">Dashboard de Luminarias</h2>
+                    <p class="text-secondary-500 dark:text-secondary-400 text-sm">Monitoreo y análisis de luminarias en tiempo real</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="flex items-center">
+                        <div class="relative">
+                            <select id="filter-terminal" class="appearance-none bg-white dark:bg-secondary-800 border border-secondary-300 dark:border-secondary-600 text-secondary-700 dark:text-secondary-300 rounded-md py-1.5 pl-3 pr-8 text-xs focus:outline-none focus:ring-primary-500 focus:border-primary-500">
+                                <option value="all">Todos los terminales</option>
+                                ${Object.keys(TERMINALES).map(term => `<option value="${term}">${term}</option>`).join('')}
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-secondary-500">
+                                <i class="ti ti-chevron-down text-xs"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="relative">
+                            <select id="filter-estado" class="appearance-none bg-white dark:bg-secondary-800 border border-secondary-300 dark:border-secondary-600 text-secondary-700 dark:text-secondary-300 rounded-md py-1.5 pl-3 pr-8 text-xs focus:outline-none focus:ring-primary-500 focus:border-primary-500">
+                                <option value="all">Todos los estados</option>
+                                ${ESTADOS.map(estado => `<option value="${estado}">${estado}</option>`).join('')}
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-secondary-500">
+                                <i class="ti ti-chevron-down text-xs"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="settings-btn" class="p-2 rounded-md text-secondary-500 hover:text-primary-600 dark:text-secondary-400 dark:hover:text-primary-400 hover:bg-secondary-100 dark:hover:bg-secondary-700 transition-colors">
+                        <i class="ti ti-adjustments-horizontal"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Estadísticas principales -->
+            <div id="stats-container" class="grid-dashboard mb-8"></div>
+            
+            <!-- Mapa de inspecciones -->
+            <div class="bg-white dark:bg-secondary-800 rounded-xl shadow-sm p-4 mb-8 transition-colors duration-200">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 space-y-2 sm:space-y-0">
+                    <h3 class="text-base font-semibold text-secondary-900 dark:text-white flex items-center">
+                        <i class="ti ti-map-2 mr-2 text-primary-600 dark:text-primary-400"></i>
+                        Mapa de Luminarias
+                    </h3>
+                    <div class="flex flex-wrap gap-1.5">
+                        ${Object.keys(TERMINALES).map(name => 
+                            `<button data-terminal="${name}" class="terminal-btn bg-secondary-100 dark:bg-secondary-700 hover:bg-secondary-200 dark:hover:bg-secondary-600 text-secondary-700 dark:text-secondary-300 text-xs py-1 px-2 rounded-md transition-colors duration-150 flex items-center">
+                                <i class="ti ti-map-pin-filled text-xs mr-1"></i>
+                                ${name.replace('Maria Angelica', 'M.A.')}
+                            </button>`
+                        ).join('')}
+                        <button id="my-location-btn" class="bg-primary-50 dark:bg-primary-900/30 hover:bg-primary-100 dark:hover:bg-primary-800/40 text-primary-700 dark:text-primary-300 text-xs py-1 px-2 rounded-md transition-colors duration-150 flex items-center">
+                            <i class="ti ti-current-location text-xs mr-1"></i>
+                            Mi Ubicación
+                        </button>
+                    </div>
+                </div>
+                <div id="dashboardMap" class="map-container"></div>
+            </div>
+            
+            <!-- Gráficos y análisis -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="bg-white dark:bg-secondary-800 rounded-xl shadow-sm p-4 transition-colors duration-200">
+                    <h3 class="text-base font-semibold text-secondary-900 dark:text-white mb-4 flex items-center">
+                        <i class="ti ti-chart-pie mr-2 text-primary-600 dark:text-primary-400"></i>
+                        Distribución de Estados
+                    </h3>
+                    <div class="chart-container">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-white dark:bg-secondary-800 rounded-xl shadow-sm p-4 transition-colors duration-200">
+                    <h3 class="text-base font-semibold text-secondary-900 dark:text-white mb-4 flex items-center">
+                        <i class="ti ti-chart-bar mr-2 text-primary-600 dark:text-primary-400"></i>
+                        Postes por Terminal
+                    </h3>
+                    <div class="chart-container">
+                        <canvas id="typeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tabla de registros -->
+            <div class="bg-white dark:bg-secondary-800 rounded-xl shadow-sm p-4 transition-colors duration-200">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-base font-semibold text-secondary-900 dark:text-white flex items-center">
+                        <i class="ti ti-table mr-2 text-primary-600 dark:text-primary-400"></i>
+                        Registros de Inspecciones
+                    </h3>
+                    <div class="flex items-center">
+                        <div class="relative">
+                            <input type="text" id="search-table" placeholder="Buscar..." class="py-1 px-3 pr-8 text-xs border border-secondary-300 dark:border-secondary-600 rounded-md bg-white dark:bg-secondary-800 text-secondary-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500 w-full sm:w-auto transition-colors duration-200">
+                            <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-secondary-400">
+                                <i class="ti ti-search text-xs"></i>
+                            </div>
+                        </div>
+                        <button id="export-table-btn" class="ml-2 p-1.5 text-secondary-500 hover:text-primary-600 dark:text-secondary-400 dark:hover:text-primary-400 rounded transition-colors" title="Exportar tabla">
+                            <i class="ti ti-file-export"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto rounded-lg border border-secondary-200 dark:border-secondary-700 transition-colors duration-200">
+                    <table class="min-w-full divide-y divide-secondary-200 dark:divide-secondary-700 transition-colors duration-200">
+                        <thead class="bg-secondary-50 dark:bg-secondary-700/50 transition-colors duration-200">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-secondary-500 dark:text-secondary-400 uppercase tracking-wider">Terminal</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-secondary-500 dark:text-secondary-400 uppercase tracking-wider">Tipo Poste</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-secondary-500 dark:text-secondary-400 uppercase tracking-wider">Estado</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-secondary-500 dark:text-secondary-400 uppercase tracking-wider">Fecha</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-secondary-500 dark:text-secondary-400 uppercase tracking-wider">Coordenadas</th>
+                                <th class="px-4 py-3 text-right text-xs font-medium text-secondary-500 dark:text-secondary-400 uppercase tracking-wider">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reports-table-body" class="bg-white dark:bg-secondary-800 divide-y divide-secondary-200 dark:divide-secondary-700 transition-colors duration-200">
+                            <!-- Los datos se cargarán dinámicamente -->
+                            <tr>
+                                <td colspan="6" class="px-4 py-4 text-center text-secondary-500 dark:text-secondary-400">
+                                    <div class="flex flex-col items-center justify-center py-6">
+                                        <div class="spinner text-primary-500 mb-3"></div>
+                                        <p>Cargando datos...</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4 flex flex-col sm:flex-row items-center justify-between text-xs text-secondary-500 dark:text-secondary-400">
+                    <div id="table-info" class="mb-2 sm:mb-0">
+                        Mostrando <span id="showing-count">0</span> de <span id="total-count">0</span> registros
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <button id="prev-page" class="p-1 rounded-md hover:bg-secondary-100 dark:hover:bg-secondary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="ti ti-chevron-left"></i>
+                        </button>
+                        <div id="pagination-numbers" class="flex items-center space-x-1">
+                            <!-- Números de página generados dinámicamente -->
+                        </div>
+                        <button id="next-page" class="p-1 rounded-md hover:bg-secondary-100 dark:hover:bg-secondary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="ti ti-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        const formTemplate = `
+            <div class="max-w-2xl mx-auto bg-white dark:bg-secondary-800 p-6 rounded-xl shadow-sm transition-colors duration-200">
+                <div class="mb-6">
+                    <h2 class="text-xl font-display font-semibold text-secondary-900 dark:text-white mb-2">Registrar Nueva Inspección</h2>
+                    <p class="text-secondary-500 dark:text-secondary-400 text-sm">Complete el formulario para registrar una nueva inspección de luminaria</p>
+                </div>
+                
+                <form id="inspectionForm" class="space-y-5">
+                    <!-- Terminal -->
+                    <div>
+                        <label for="terminal" class="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-1">Terminal <span class="text-danger">*</span></label>
+                        <div class="relative">
+                            <select id="terminal" name="terminal" required class="block w-full appearance-none bg-white dark:bg-secondary-800 border border-secondary-300 dark:border-secondary-600 text-secondary-900 dark:text-white rounded-md py-2 px-3 pr-8 text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200">
+                                <option value="">Seleccione un terminal...</option>
+                                ${Object.keys(TERMINALES).map(t => `<option value="${t}">${t}</option>`).join('')}
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-secondary-500">
+                                <i class="ti ti-chevron-down"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tipo de Poste y Estado -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div>
+                            <label for="tipo_poste" class="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-1">Tipo de Poste <span class="text-danger">*</span></label>
+                            <div class="relative">
+                                <select id="tipo_poste" name="tipo_poste" required class="block w-full appearance-none bg-white dark:bg-secondary-800 border border-secondary-300 dark:border-secondary-600 text-secondary-900 dark:text-white rounded-md py-2 px-3 pr-8 text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200">
+                                    ${TIPO_POSTES.map(tipo => `<option value="${tipo}">${tipo}</option>`).join('')}
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-secondary-500">
+                                    <i class="ti ti-chevron-down"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="estado" class="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-1">Estado <span class="text-danger">*</span></label>
+                            <div class="relative">
+                                <select id="estado" name="estado" required class="block w-full appearance-none bg-white dark:bg-secondary-800 border border-secondary-300 dark:border-secondary-600 text-secondary-900 dark:text-white rounded-md py-2 px-3 pr-8 text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200">
+                                    ${ESTADOS.map(estado => `<option value="${estado}">${estado}</option>`).join('')}
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-secondary-500">
+                                    <i class="ti ti-chevron-down"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Imagen (condicional) -->
+                    <div id="imageUploadContainer" class="hidden">
+                        <label for="imageFile" class="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-1">Imagen de la falla</label>
+                        <div class="border-2 border-dashed border-secondary-300 dark:border-secondary-600 rounded-lg p-4 transition-colors duration-200">
+                            <div class="space-y-2 text-center">
+                                <img id="image-preview" class="hidden mx-auto h-32 w-auto object-cover rounded-lg" src="">
+                                <div id="upload-icon" class="mx-auto flex items-center justify-center h-12 w-12 text-secondary-400 dark:text-secondary-500">
+                                    <i class="ti ti-photo-plus text-3xl"></i>
+                                </div>
+                                <div class="flex justify-center text-sm text-secondary-600 dark:text-secondary-400">
+                                    <label for="imageFile" class="relative cursor-pointer bg-white dark:bg-secondary-800 rounded-md font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500">
+                                        <span>Subir imagen</span>
+                                        <input id="imageFile" name="imageFile" type="file" class="sr-only" accept="image/*">
+                                    </label>
+                                    <p class="pl-1">o arrastrar y soltar</p>
+                                </div>
+                                <p class="text-xs text-secondary-500 dark:text-secondary-400">
+                                    PNG, JPG, WEBP hasta 5MB
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Observación -->
+                    <div>
+                        <label for="observacion" class="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-1">Observación</label>
+                        <textarea id="observacion" name="observacion" rows="3" class="block w-full bg-white dark:bg-secondary-800 border border-secondary-300 dark:border-secondary-600 rounded-md py-2 px-3 text-sm text-secondary-900 dark:text-white placeholder-secondary-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200" placeholder="Describa cualquier detalle relevante..."></textarea>
+                    </div>
+                    
+                    <!-- Ubicación -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-sm font-medium text-secondary-700 dark:text-secondary-300">Ubicación <span class="text-danger">*</span></label>
+                            <div class="flex items-center">
+                                <span id="location-accuracy" class="text-xs text-secondary-500 dark:text-secondary-400 mr-2"></span>
+                                <button type="button" id="refresh-location" class="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 text-sm focus:outline-none">
+                                    <i class="ti ti-refresh"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <p class="text-xs text-secondary-500 dark:text-secondary-400 mb-2">La ubicación se detecta automáticamente. Mueva el marcador para ajustar la posición exacta.</p>
+                        <div id="formMap" class="map-container mb-2"></div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="latitude" class="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-1">Latitud</label>
+                                <input type="text" id="latitude" name="latitude" readonly class="block w-full bg-secondary-50 dark:bg-secondary-700 border border-secondary-300 dark:border-secondary-600 rounded-md py-1.5 px-3 text-xs font-mono text-secondary-900 dark:text-white focus:outline-none transition-colors duration-200">
+                            </div>
+                            <div>
+                                <label for="longitude" class="block text-xs font-medium text-secondary-500 dark:text-secondary-400 mb-1">Longitud</label>
+                                <input type="text" id="longitude" name="longitude" readonly class="block w-full bg-secondary-50 dark:bg-secondary-700 border border-secondary-300 dark:border-secondary-600 rounded-md py-1.5 px-3 text-xs font-mono text-secondary-900 dark:text-white focus:outline-none transition-colors duration-200">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Botones de acción -->
+                    <div class="flex justify-end pt-2">
+                        <button type="button" id="reset-form-btn" class="mr-3 px-4 py-2 bg-white dark:bg-secondary-700 text-secondary-700 dark:text-secondary-300 border border-secondary-300 dark:border-secondary-600 rounded-md text-sm hover:bg-secondary-50 dark:hover:bg-secondary-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
+                            Limpiar
+                        </button>
+                        <button type="submit" id="submitButton" class="px-4 py-2 bg-primary-600 text-white rounded-md text-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+                            <span id="buttonText">Enviar Reporte</span>
+                            <span id="loader" class="spinner ml-2 hidden"></span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `;
+        
+        // Sistema de gestión de temas
+        const themeManager = {
+            init() {
+                this.themeToggleBtn = document.getElementById('theme-toggle');
+                this.themeOptions = {
+                    light: document.getElementById('theme-light'),
+                    dark: document.getElementById('theme-dark'),
+                    system: document.getElementById('theme-system')
+                };
+                
+                // Inicializar el tema basado en la preferencia guardada o el sistema
+                this.currentTheme = localStorage.getItem('theme') || 'system';
+                this.applyTheme();
+                
+                // Eventos
+                this.themeToggleBtn.addEventListener('click', () => this.toggleTheme());
+                
+                // Eventos para el modal de configuración
+                if (this.themeOptions.light) {
+                    this.themeOptions.light.addEventListener('click', () => this.setTheme('light'));
+                }
+                if (this.themeOptions.dark) {
+                    this.themeOptions.dark.addEventListener('click', () => this.setTheme('dark'));
+                }
+                if (this.themeOptions.system) {
+                    this.themeOptions.system.addEventListener('click', () => this.setTheme('system'));
+                }
+                
+                // Escuchar cambios en las preferencias del sistema
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+                    if (this.currentTheme === 'system') {
+                        this.applyTheme();
+                    }
+                });
+            },
+            
+            applyTheme() {
+                const isDark = this.shouldUseDarkMode();
+                document.documentElement.classList.toggle('dark', isDark);
+                this.updateActiveThemeButton();
+            },
+            
+            shouldUseDarkMode() {
+                if (this.currentTheme === 'dark') return true;
+                if (this.currentTheme === 'light') return false;
+                return window.matchMedia('(prefers-color-scheme: dark)').matches;
+            },
+            
+            toggleTheme() {
+                if (this.currentTheme === 'system') {
+                    this.setTheme(this.shouldUseDarkMode() ? 'light' : 'dark');
+                } else if (this.currentTheme === 'dark') {
+                    this.setTheme('light');
+                } else {
+                    this.setTheme('dark');
+                }
+            },
+            
+            setTheme(theme) {
+                this.currentTheme = theme;
+                localStorage.setItem('theme', theme);
+                this.applyTheme();
+                hideModal('settings-modal');
+            },
+            
+            updateActiveThemeButton() {
+                if (!this.themeOptions.light) return;
+                // Actualizar botones de tema en el modal
+                for (const [theme, button] of Object.entries(this.themeOptions)) {
+                    // Primero, eliminar las clases personalizadas de todos los botones
+                    ['border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/30', 'text-primary-600', 'dark:text-primary-400'].forEach(cls => {
+                        button.classList.remove(cls);
+                    });
+                    // Si es el tema activo, agregar las clases
+                    if (theme === this.currentTheme) {
+                        ['border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/30', 'text-primary-600', 'dark:text-primary-400'].forEach(cls => {
+                            button.classList.add(cls);
+                        });
+                    }
+                }
+            }
+        };
+        
+        // Sistema de notificaciones (Toast)
+        const toast = {
+            element: document.getElementById('toast'),
+            messageElement: document.getElementById('toast-message'),
+            iconElement: document.getElementById('toast-icon'),
+            timeout: null,
+            
+            show(message, type = 'success', duration = 4000) {
+                // Configurar el contenido
+                this.messageElement.textContent = message;
+                
+                // Configurar el icono y color basado en el tipo
+                let iconClass, bgColorClass;
+                
+                switch (type) {
+                    case 'success':
+                        iconClass = 'ti ti-circle-check text-success';
+                        bgColorClass = 'border-l-4 border-success';
+                        break;
+                    case 'error':
+                        iconClass = 'ti ti-alert-circle text-danger';
+                        bgColorClass = 'border-l-4 border-danger';
+                        break;
+                    case 'warning':
+                        iconClass = 'ti ti-alert-triangle text-warning';
+                        bgColorClass = 'border-l-4 border-warning';
+                        break;
+                    case 'info':
+                        iconClass = 'ti ti-info-circle text-primary-500 dark:text-primary-400';
+                        bgColorClass = 'border-l-4 border-primary-500 dark:border-primary-400';
+                        break;
+                    default:
+                        iconClass = 'ti ti-info-circle text-primary-500 dark:text-primary-400';
+                        bgColorClass = 'border-l-4 border-primary-500 dark:border-primary-400';
+                }
+                
+                // Aplicar clases
+                this.iconElement.className = iconClass;
+                this.element.className = `toast bg-white dark:bg-secondary-800 text-secondary-900 dark:text-white shadow-lg ${bgColorClass}`;
+                
+                // Mostrar la notificación
+                this.element.classList.remove('hidden');
+                setTimeout(() => {
+                    this.element.classList.add('show');
+                }, 10);
+                
+                // Configurar el cierre automático
+                clearTimeout(this.timeout);
+                this.timeout = setTimeout(() => this.hide(), duration);
+                
+                // Permitir cerrar al hacer clic
+                this.element.onclick = () => this.hide();
+            },
+            
+            hide() {
+                this.element.classList.remove('show');
+                setTimeout(() => {
+                    this.element.classList.add('hidden');
+                }, 500);
+            }
+        };
+        
+        // Sistema de gestión de modales
+        function showModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (!modal) return;
+            
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.add('opacity-100');
+                modal.querySelector('.modal-content').classList.add('opacity-100', 'scale-100');
+            }, 10);
+        }
+        
+        function hideModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (!modal) return;
+            
+            modal.classList.remove('opacity-100');
+            modal.querySelector('.modal-content').classList.remove('opacity-100', 'scale-100');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+        
+        // Navegación de la aplicación
+        function switchView(view) {
+            AppState.currentView = view;
+            
+            // Actualizar clases de navegación
+            document.getElementById('nav-dashboard').classList.toggle('active', view === 'dashboard');
+            document.getElementById('nav-form').classList.toggle('active', view === 'form');
+            
+            // Ocultar/mostrar secciones
+            const dashboardSection = document.getElementById('dashboard-section');
+            const formSection = document.getElementById('form-section');
+            
+            dashboardSection.classList.toggle('hidden', view !== 'dashboard');
+            formSection.classList.toggle('hidden', view !== 'form');
+            
+            // Reiniciar la animación de entrada
+            if (view === 'dashboard') {
+                dashboardSection.classList.remove('fade-enter-active');
+                dashboardSection.classList.add('fade-enter');
+                dashboardSection.innerHTML = dashboardTemplate;
+                
+                // Forzar reflow para reiniciar la animación
+                void dashboardSection.offsetWidth;
+                
+                // Aplicar la animación
+                dashboardSection.classList.add('fade-enter-active');
+                dashboardSection.classList.remove('fade-enter');
+                
+                // Inicializar el dashboard
+                renderDashboard();
+                // --- SOLUCIÓN: Forzar el resize y centrado del mapa tras mostrar el dashboard ---
+                setTimeout(() => {
+                    if (AppState.maps.dashboardMap) {
+                        AppState.maps.dashboardMap.invalidateSize();
+                        AppState.maps.dashboardMap.setView(DEFAULT_COORDS, 11);
+                    }
+                }, 350); // Espera a que la animación termine
+            } else if (view === 'form') {
+                formSection.classList.remove('fade-enter-active');
+                formSection.classList.add('fade-enter');
+                formSection.innerHTML = formTemplate;
+                // Forzar reflow para reiniciar la animación
+                void formSection.offsetWidth;
+                // Aplicar la animación
+                formSection.classList.add('fade-enter-active');
+                formSection.classList.remove('fade-enter');
+                // Inicializar el formulario
+                initForm();
+                // --- SOLUCIÓN: Forzar el resize y centrado del mapa tras mostrar el formulario ---
+                setTimeout(() => {
+                    if (AppState.maps.formMap) {
+                        AppState.maps.formMap.invalidateSize();
+                        // Centrar en la ubicación actual si existe, si no en el punto por defecto
+                        const coords = AppState.currentLocation
+                            ? [AppState.currentLocation.latitude, AppState.currentLocation.longitude]
+                            : DEFAULT_COORDS;
+                        AppState.maps.formMap.setView(coords, 17);
+                    }
+                }, 350); // Espera a que la animación termine
+            }
+        }
+        
+        // --- Lógica del Dashboard ---
+        function renderDashboard() {
+            applyFilters();
+            initDashboardMap();
+            updateStats();
+            updateCharts();
+            initTableFiltering();
+            bindDashboardEvents();
+            checkDataConsistency();
+        }
+        
+        function bindDashboardEvents() {
+            // Botones de terminales
+            document.querySelectorAll('.terminal-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const terminal = btn.dataset.terminal;
+                    if (AppState.maps.dashboardMap && TERMINALES[terminal]) {
+                        AppState.maps.dashboardMap.setView(TERMINALES[terminal], 16);
+                        
+                        // Actualizar filtro de terminal
+                        document.getElementById('filter-terminal').value = terminal;
+                        applyFilters();
+                    }
+                });
             });
             
-            // Cargar y suscribirse a los reportes existentes
-            subscribeToReports();
-            isMapInitialized = true;
+            // Botón de mi ubicación
+            document.getElementById('my-location-btn').addEventListener('click', () => {
+                if (AppState.currentLocation && AppState.maps.dashboardMap) {
+                    AppState.maps.dashboardMap.setView([AppState.currentLocation.latitude, AppState.currentLocation.longitude], 16);
+                } else {
+                    requestGeolocation((pos) => {
+                        if (AppState.maps.dashboardMap) {
+                            AppState.maps.dashboardMap.setView([pos.coords.latitude, pos.coords.longitude], 16);
+                        }
+                    });
+                }
+            });
+            
+            // Botón de configuración
+            document.getElementById('settings-btn').addEventListener('click', () => {
+                showModal('settings-modal');
+            });
+            
+            // Exportar tabla
+            document.getElementById('export-table-btn').addEventListener('click', () => {
+                exportDataToExcel(AppState.filteredInspections, 'inspecciones_luminarias');
+            });
+            
+            // Filtros
+            document.getElementById('filter-terminal').addEventListener('change', applyFilters);
+            document.getElementById('filter-estado').addEventListener('change', applyFilters);
+            
+            // Botón para cerrar el modal de configuración
+            document.getElementById('close-settings-modal-btn').addEventListener('click', () => {
+                hideModal('settings-modal');
+            });
+            
+            // Opciones de configuración
+            document.getElementById('map-style').value = AppState.mapStyle;
+            document.getElementById('map-cluster').checked = AppState.useCluster;
+            
+            document.getElementById('map-style').addEventListener('change', (e) => {
+                AppState.mapStyle = e.target.value;
+                localStorage.setItem('mapStyle', AppState.mapStyle);
+                updateMapTiles();
+            });
+            
+            document.getElementById('map-cluster').addEventListener('change', (e) => {
+                AppState.useCluster = e.target.checked;
+                localStorage.setItem('useCluster', AppState.useCluster ? 'true' : 'false');
+                initDashboardMap();
+            });
+            
+            // Exportar todos los datos
+            document.getElementById('export-data-btn').addEventListener('click', () => {
+                exportDataToExcel(AppState.inspections, 'todos_los_registros_luminarias');
+                hideModal('settings-modal');
+                toast.show('Datos exportados correctamente', 'success');
+            });
+            
+            // Restablecer filtros
+            document.getElementById('reset-filters-btn').addEventListener('click', () => {
+                document.getElementById('filter-terminal').value = 'all';
+                document.getElementById('filter-estado').value = 'all';
+                document.getElementById('search-table').value = '';
+                AppState.filters = {
+                    terminal: 'all',
+                    estado: 'all',
+                    tipo_poste: 'all',
+                    dateRange: {
+                        start: null,
+                        end: null
+                    }
+                };
+                applyFilters();
+                hideModal('settings-modal');
+                toast.show('Filtros restablecidos', 'info');
+            });
         }
-
-        // --- LÓGICA DE GEOLOCALIZACIÓN (EN TIEMPO REAL) ---
-        if (navigator.geolocation) {
+        
+        function checkDataConsistency() {
+            const warning = document.getElementById('data-consistency-warning');
+            if (!warning) return;
+            
+            const hasInconsistentData = AppState.inspections.some(i => !i.terminal || !i.tipo_poste || !i.estado || !i.latitude || !i.longitude);
+            warning.classList.toggle('hidden', !hasInconsistentData);
+        }
+        
+        function applyFilters() {
+            // Obtener valores de filtros
+            const terminalFilter = document.getElementById('filter-terminal')?.value || 'all';
+            const estadoFilter = document.getElementById('filter-estado')?.value || 'all';
+            const searchQuery = document.getElementById('search-table')?.value.toLowerCase() || '';
+            
+            // Actualizar estado de filtros
+            AppState.filters.terminal = terminalFilter;
+            AppState.filters.estado = estadoFilter;
+            
+            // Aplicar filtros
+            AppState.filteredInspections = AppState.inspections.filter(inspection => {
+                // Filtro de terminal
+                if (terminalFilter !== 'all' && inspection.terminal !== terminalFilter) return false;
+                
+                // Filtro de estado
+                if (estadoFilter !== 'all' && inspection.estado !== estadoFilter) return false;
+                
+                // Búsqueda
+                if (searchQuery) {
+                    const searchableFields = [
+                        inspection.terminal || '',
+                        inspection.tipo_poste || '',
+                        inspection.estado || '',
+                        inspection.observacion || ''
+                    ].map(field => field.toLowerCase());
+                    
+                    if (!searchableFields.some(field => field.includes(searchQuery))) return false;
+                }
+                
+                return true;
+            });
+            
+            // Actualizar UI
+            updateStats();
+            updateCharts();
+            updateDashboardMapMarkers();
+            updateReportsTable();
+        }
+        
+        function updateStats() {
+            const container = document.getElementById('stats-container');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            // Estadísticas generales
+            const totalInspections = AppState.filteredInspections.length;
+            const goodCondition = AppState.filteredInspections.filter(i => i.estado === 'Bueno').length;
+            const badCondition = totalInspections - goodCondition;
+            const withImages = AppState.filteredInspections.filter(i => i.image_url).length;
+            const terminalCounts = {};
+            
+            // Contar por terminal
+            Object.keys(TERMINALES).forEach(term => {
+                terminalCounts[term] = AppState.filteredInspections.filter(i => i.terminal === term).length;
+            });
+            
+            // Card para el total
+            container.innerHTML += `
+                <div class="bg-white dark:bg-secondary-800 rounded-xl p-4 hover-scale transition-all duration-200 shadow-sm">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <p class="text-secondary-500 dark:text-secondary-400 text-sm">Total de Inspecciones</p>
+                            <h4 class="mt-1 text-2xl font-semibold text-secondary-900 dark:text-white">${totalInspections}</h4>
+                        </div>
+                        <div class="bg-primary-50 dark:bg-primary-900/30 p-2 rounded-lg">
+                            <i class="ti ti-clipboard-check text-primary-500 dark:text-primary-400 text-lg"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center text-xs">
+                        <span class="flex items-center text-success mr-3">
+                            <i class="ti ti-circle-check mr-1"></i> ${goodCondition} buenos
+                        </span>
+                        <span class="flex items-center text-danger">
+                            <i class="ti ti-alert-circle mr-1"></i> ${badCondition} con fallas
+                        </span>
+                    </div>
+                </div>
+            `;
+            
+            // Card para el porcentaje de buen estado
+            const percentageGood = totalInspections > 0 ? Math.round((goodCondition / totalInspections) * 100) : 0;
+            container.innerHTML += `
+                <div class="bg-white dark:bg-secondary-800 rounded-xl p-4 hover-scale transition-all duration-200 shadow-sm">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <p class="text-secondary-500 dark:text-secondary-400 text-sm">Condición</p>
+                            <h4 class="mt-1 text-2xl font-semibold text-secondary-900 dark:text-white">${percentageGood}%</h4>
+                        </div>
+                        <div class="relative w-10 h-10">
+                            <svg class="w-10 h-10 transform -rotate-90">
+                                <circle cx="20" cy="20" r="15" fill="none" stroke-width="3" stroke="currentColor" class="text-secondary-200 dark:text-secondary-700"></circle>
+                                <circle cx="20" cy="20" r="15" fill="none" stroke-width="3" stroke="currentColor" 
+                                    class="${percentageGood >= 70 ? 'text-success' : percentageGood >= 40 ? 'text-warning' : 'text-danger'} progress-ring"
+                                    stroke-dasharray="94.2"
+                                    stroke-dashoffset="${94.2 - (94.2 * percentageGood / 100)}"></circle>
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center text-xs font-semibold">
+                                <i class="ti ti-bulb ${percentageGood >= 70 ? 'text-success' : percentageGood >= 40 ? 'text-warning' : 'text-danger'}"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center text-xs">
+                        <span class="${percentageGood >= 70 ? 'text-success' : percentageGood >= 40 ? 'text-warning' : 'text-danger'}">
+                            ${percentageGood >= 70 ? 'Buen estado general' : percentageGood >= 40 ? 'Atención requerida' : 'Mantenimiento urgente'}
+                        </span>
+                    </div>
+                </div>
+            `;
+            
+            // Distribuir terminales en las tarjetas restantes
+            Object.keys(TERMINALES).slice(0, 3).forEach(terminal => {
+                const count = terminalCounts[terminal] || 0;
+                const goodCount = AppState.filteredInspections.filter(i => i.terminal === terminal && i.estado === 'Bueno').length;
+                const badCount = count - goodCount;
+                const goodPercentage = count > 0 ? Math.round((goodCount / count) * 100) : 0;
+                
+                container.innerHTML += `
+                    <div class="bg-white dark:bg-secondary-800 rounded-xl p-4 hover-scale transition-all duration-200 shadow-sm">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <p class="text-secondary-500 dark:text-secondary-400 text-sm">Terminal ${terminal.replace('Maria Angelica', 'M.A.')}</p>
+                                <h4 class="mt-1 text-2xl font-semibold text-secondary-900 dark:text-white">${count}</h4>
+                            </div>
+                            <div class="bg-secondary-50 dark:bg-secondary-700 p-2 rounded-lg">
+                                <i class="ti ti-map-pin text-secondary-500 dark:text-secondary-400 text-lg"></i>
+                            </div>
+                        </div>
+                        <div class="mt-3 flex items-center text-xs">
+                            <div class="w-full bg-secondary-200 dark:bg-secondary-700 rounded-full h-1.5">
+                                <div class="bg-success h-1.5 rounded-full" style="width: ${goodPercentage}%"></div>
+                            </div>
+                            <span class="ml-2 text-secondary-500 dark:text-secondary-400">${goodPercentage}%</span>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        
+        function updateCharts() {
+            setTimeout(() => {
+                if (AppState.currentView !== 'dashboard') return;
+                
+                const statusCtx = document.getElementById('statusChart')?.getContext('2d');
+                const typeCtx = document.getElementById('typeChart')?.getContext('2d');
+                
+                if (!statusCtx || !typeCtx) return;
+                
+                // Destruir gráficos existentes
+                if (AppState.charts.statusChart) AppState.charts.statusChart.destroy();
+                if (AppState.charts.typeChart) AppState.charts.typeChart.destroy();
+                
+                // Verificar si hay datos
+                if (AppState.filteredInspections.length === 0) {
+                    const showEmptyMessage = (ctx) => {
+                        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                        ctx.save();
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--tw-text-opacity') > 0.5 ? '#9CA3AF' : '#6B7280';
+                        ctx.font = '14px Inter';
+                        ctx.fillText('No hay datos para mostrar', ctx.canvas.width / 2, ctx.canvas.height / 2);
+                        ctx.restore();
+                    };
+                    
+                    showEmptyMessage(statusCtx);
+                    showEmptyMessage(typeCtx);
+                    return;
+                }
+                
+                // Conteo de estados
+                const statusCounts = AppState.filteredInspections.reduce((acc, i) => {
+                    const estado = i.estado || 'No especificado';
+                    acc[estado] = (acc[estado] || 0) + 1;
+                    return acc;
+                }, {});
+                
+                // Colores para estados
+                const stateColors = {
+                    'Bueno': '#10B981',
+                    'Mal direccionado': '#F59E0B',
+                    'Corte eléctrico': '#EF4444',
+                    'Apagado': '#6B7280',
+                    'Falla intermitente': '#8B5CF6',
+                    'Dañado': '#EC4899',
+                    'En mantenimiento': '#3B82F6',
+                    'No especificado': '#9CA3AF'
+                };
+                
+                // Crear colores para estados
+                const statusLabels = Object.keys(statusCounts);
+                const statusColors = statusLabels.map(label => stateColors[label] || '#9CA3AF');
+                
+                // Gráfico de distribución de estados
+                AppState.charts.statusChart = new Chart(statusCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: statusLabels,
+                        datasets: [{
+                            data: Object.values(statusCounts),
+                            backgroundColor: statusColors,
+                            hoverOffset: 4,
+                            borderWidth: 2,
+                            borderColor: document.documentElement.classList.contains('dark') ? '#1E293B' : '#FFFFFF'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '70%',
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: {
+                                    boxWidth: 12,
+                                    padding: 10,
+                                    font: {
+                                        size: 11
+                                    },
+                                    color: document.documentElement.classList.contains('dark') ? '#CBD5E1' : '#475569'
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.label || '';
+                                        const value = context.raw || 0;
+                                        const total = context.dataset.data.reduce((acc, val) => acc + val, 0);
+                                        const percentage = Math.round((value / total) * 100);
+                                        return `${label}: ${value} (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                // Datos para gráfico de tipos por terminal
+                const typeData = Object.keys(TERMINALES).map(t => {
+                    const terminalInspections = AppState.filteredInspections.filter(i => i.terminal === t);
+                    
+                    // Agrupar por tipo de poste
+                    const typeGroups = terminalInspections.reduce((acc, i) => {
+                        const tipo = i.tipo_poste || 'No especificado';
+                        acc[tipo] = (acc[tipo] || 0) + 1;
+                        return acc;
+                    }, {});
+                    
+                    return {
+                        terminal: t,
+                        types: typeGroups
+                    };
+                });
+                
+                // Obtener todos los tipos únicos
+                const allTypes = [...new Set(AppState.filteredInspections.map(i => i.tipo_poste || 'No especificado'))];
+                
+                // Preparar datasets para cada tipo
+                const datasets = allTypes.map((type, index) => {
+                    // Colores para cada tipo
+                    const colors = [
+                        'rgba(59, 130, 246, 0.8)',   // Azul
+                        'rgba(167, 139, 250, 0.8)',  // Púrpura
+                        'rgba(236, 72, 153, 0.8)',   // Rosa
+                        'rgba(248, 113, 113, 0.8)',  // Rojo claro
+                        'rgba(251, 146, 60, 0.8)'    // Naranja
+                    ];
+                    
+                    return {
+                        label: type,
+                        data: typeData.map(td => td.types[type] || 0),
+                        backgroundColor: colors[index % colors.length]
+                    };
+                });
+                
+                // Gráfico de tipos por terminal
+                AppState.charts.typeChart = new Chart(typeCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: typeData.map(d => d.terminal.replace("Maria Angelica", "M.A.")),
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                stacked: true,
+                                grid: {
+                                    display: false
+                                },
+                                ticks: {
+                                    color: document.documentElement.classList.contains('dark') ? '#CBD5E1' : '#475569',
+                                    font: {
+                                        size: 10
+                                    }
+                                }
+                            },
+                            y: {
+                                stacked: true,
+                                beginAtZero: true,
+                                grid: {
+                                    color: document.documentElement.classList.contains('dark') ? 'rgba(203, 213, 225, 0.1)' : 'rgba(71, 85, 105, 0.1)'
+                                },
+                                ticks: {
+                                    color: document.documentElement.classList.contains('dark') ? '#CBD5E1' : '#475569',
+                                    font: {
+                                        size: 10
+                                    }
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                labels: {
+                                    boxWidth: 12,
+                                    padding: 10,
+                                    font: {
+                                        size: 11
+                                    },
+                                    color: document.documentElement.classList.contains('dark') ? '#CBD5E1' : '#475569'
+                                }
+                            }
+                        }
+                    }
+                });
+            }, 100);
+        }
+        
+        function initDashboardMap() {
+            const mapEl = document.getElementById('dashboardMap');
+            if (!mapEl) return;
+            
+            // Destruir mapa existente si existe
+            if (AppState.maps.dashboardMap) {
+                AppState.maps.dashboardMap.remove();
+                AppState.maps.dashboardMap = null;
+                AppState.maps.markerCluster = null;
+            }
+            
+            // Crear nuevo mapa
+            AppState.maps.dashboardMap = L.map(mapEl, {
+                zoomControl: false,
+                attributionControl: false
+            }).setView(DEFAULT_COORDS, 11);
+            
+            // Añadir controles de zoom en la esquina superior derecha
+            L.control.zoom({
+                position: 'topright'
+            }).addTo(AppState.maps.dashboardMap);
+            
+            // Añadir atribución en la esquina inferior izquierda
+            L.control.attribution({
+                position: 'bottomleft',
+                prefix: false
+            }).addTo(AppState.maps.dashboardMap).setPrefix(false).addAttribution(MAP_TILES[AppState.mapStyle].attribution);
+            
+            // Añadir capa de mapa
+            L.tileLayer(MAP_TILES[AppState.mapStyle].url, {
+                maxZoom: 19
+            }).addTo(AppState.maps.dashboardMap);
+            
+            // Añadir marcadores de terminales
+            Object.entries(TERMINALES).forEach(([name, coords]) => {
+                const icon = L.divIcon({
+                    html: `<i class="ti ti-building-broadcast text-lg text-primary-700 dark:text-primary-400"></i>`,
+                    className: 'bg-white dark:bg-secondary-800 shadow-md rounded-full w-8 h-8 flex items-center justify-center border-2 border-primary-500 dark:border-primary-700',
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16]
+                });
+                
+                L.marker(coords, { icon }).addTo(AppState.maps.dashboardMap)
+                    .bindTooltip(name, { 
+                        permanent: false, 
+                        direction: 'top',
+                        className: 'bg-white dark:bg-secondary-800 text-secondary-900 dark:text-white shadow-md border-0 rounded px-2 py-1 text-xs'
+                    });
+            });
+            
+            // Añadir marcadores de inspecciones
+            if (AppState.useCluster) {
+                // Crear cluster group
+                AppState.maps.markerCluster = L.markerClusterGroup({
+                    showCoverageOnHover: false,
+                    maxClusterRadius: 40,
+                    iconCreateFunction: function(cluster) {
+                        const count = cluster.getChildCount();
+                        let size;
+                        
+                        if (count < 10) size = 'sm';
+                        else if (count < 50) size = 'md';
+                        else size = 'lg';
+                        
+                        const sizeMap = {
+                            sm: 30,
+                            md: 40,
+                            lg: 50
+                        };
+                        
+                        return L.divIcon({
+                            html: `<div class="flex items-center justify-center w-full h-full">${count}</div>`,
+                            className: `custom-cluster-icon ${size}`,
+                            iconSize: [sizeMap[size], sizeMap[size]]
+                        });
+                    }
+                });
+                
+                AppState.maps.dashboardMap.addLayer(AppState.maps.markerCluster);
+            }
+            
+            updateDashboardMapMarkers();
+        }
+        
+        function updateMapTiles() {
+            if (!AppState.maps.dashboardMap) return;
+            
+            // Eliminar capas de mapa existentes
+            AppState.maps.dashboardMap.eachLayer(layer => {
+                if (layer instanceof L.TileLayer) {
+                    AppState.maps.dashboardMap.removeLayer(layer);
+                }
+            });
+            
+            // Añadir nueva capa de mapa
+            L.tileLayer(MAP_TILES[AppState.mapStyle].url, {
+                maxZoom: 19
+            }).addTo(AppState.maps.dashboardMap);
+            
+            // Actualizar atribución
+            document.querySelector('.leaflet-control-attribution').innerHTML = MAP_TILES[AppState.mapStyle].attribution;
+        }
+        
+        function updateDashboardMapMarkers() {
+            if (!AppState.maps.dashboardMap) return;
+            
+            // Limpiar marcadores existentes
+            if (AppState.maps.markerCluster) {
+                AppState.maps.markerCluster.clearLayers();
+            } else {
+                AppState.maps.dashboardMap.eachLayer(layer => {
+                    if (layer instanceof L.Marker && !Object.values(TERMINALES).some(coords => layer.getLatLng().lat === coords[0] && layer.getLatLng().lng === coords[1])) {
+                        AppState.maps.dashboardMap.removeLayer(layer);
+                    }
+                });
+            }
+            
+            // Añadir marcadores para las inspecciones filtradas
+            AppState.filteredInspections.filter(i => i.latitude && i.longitude).forEach(inspection => {
+                // Determinar color del marcador según estado
+                let markerColor;
+                switch (inspection.estado) {
+                    case 'Bueno':
+                        markerColor = 'green';
+                        break;
+                    case 'Mal direccionado':
+                    case 'Falla intermitente':
+                        markerColor = 'orange';
+                        break;
+                    case 'Corte eléctrico':
+                    case 'Apagado':
+                    case 'Dañado':
+                        markerColor = 'red';
+                        break;
+                    case 'En mantenimiento':
+                        markerColor = 'blue';
+                        break;
+                    default:
+                        markerColor = 'gray';
+                }
+                
+                // Crear icono personalizado
+                const icon = L.divIcon({
+                    html: `<div class="flex items-center justify-center w-full h-full rounded-full bg-${markerColor}-100 dark:bg-${markerColor}-900/30 border-2 border-${markerColor}-500">
+                            <i class="ti ti-bulb text-${markerColor}-600 dark:text-${markerColor}-400"></i>
+                          </div>`,
+                    className: 'custom-div-icon',
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14]
+                });
+                
+                // Crear marcador
+                const marker = L.marker([inspection.latitude, inspection.longitude], { icon });
+                
+                // Configurar popup
+                const formattedDate = new Date(inspection.created_at).toLocaleString('es-CL', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                marker.bindPopup(`
+                    <div class="text-xs">
+                        <div class="font-bold mb-1">${inspection.terminal || 'Terminal no especificado'}</div>
+                        <div>${inspection.tipo_poste || 'Tipo no especificado'}</div>
+                        <div class="my-1">Estado: <span class="font-semibold text-${markerColor}-600">${inspection.estado || 'No especificado'}</span></div>
+                        <div class="text-secondary-500">${formattedDate}</div>
+                        <button class="view-detail-btn mt-2 text-primary-600 hover:text-primary-800 text-center w-full" 
+                                data-id="${inspection.id}">
+                            Ver detalles
+                        </button>
+                    </div>
+                `);
+                
+                // Añadir evento para el botón de detalles en el popup
+                marker.on('popupopen', () => {
+                    setTimeout(() => {
+                        const btn = document.querySelector(`.view-detail-btn[data-id="${inspection.id}"]`);
+                        if (btn) {
+                            btn.addEventListener('click', () => {
+                                showDetailModal(inspection);
+                            });
+                        }
+                    }, 10);
+                });
+                
+                // Añadir al mapa o al cluster
+                if (AppState.maps.markerCluster) {
+                    AppState.maps.markerCluster.addLayer(marker);
+                } else {
+                    marker.addTo(AppState.maps.dashboardMap);
+                }
+            });
+        }
+        
+        // Tabla de reportes
+        function updateReportsTable() {
+            const tableBody = document.getElementById('reports-table-body');
+            if (!tableBody) return;
+            
+            // Parámetros de paginación
+            const itemsPerPage = 10;
+            const currentPage = AppState.currentPage || 1;
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const paginatedData = AppState.filteredInspections.slice(startIndex, endIndex);
+            
+            // Actualizar información de paginación
+            const showingCount = document.getElementById('showing-count');
+            const totalCount = document.getElementById('total-count');
+            if (showingCount && totalCount) {
+                showingCount.textContent = Math.min(AppState.filteredInspections.length, endIndex);
+                totalCount.textContent = AppState.filteredInspections.length;
+            }
+            
+            // Crear paginación
+            createPagination(AppState.filteredInspections.length, itemsPerPage, currentPage);
+            
+            // Limpiar tabla
+            tableBody.innerHTML = '';
+            
+            // Verificar si hay datos
+            if (paginatedData.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-4 py-8 text-center text-secondary-500 dark:text-secondary-400">
+                            <div class="flex flex-col items-center">
+                                <i class="ti ti-clipboard-x text-4xl mb-3 text-secondary-400 dark:text-secondary-600"></i>
+                                <p class="text-sm">No se encontraron registros que coincidan con los filtros.</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            // Agregar filas
+            paginatedData.forEach(report => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-secondary-50 dark:hover:bg-secondary-700/30 transition-colors duration-150';
+                
+                // Formatear fecha
+                const formattedDate = new Date(report.created_at).toLocaleString('es-CL', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                // Formatear coordenadas
+                const lat = report.latitude ? parseFloat(report.latitude).toFixed(5) : 'N/A';
+                const lon = report.longitude ? parseFloat(report.longitude).toFixed(5) : 'N/A';
+                
+                // Crear clase de estado según el valor
+                let stateClass;
+                switch (report.estado) {
+                    case 'Bueno':
+                        stateClass = 'bg-success-light text-success-dark dark:bg-success/20 dark:text-success';
+                        break;
+                    case 'Mal direccionado':
+                    case 'Falla intermitente':
+                        stateClass = 'bg-warning-light text-warning-dark dark:bg-warning/20 dark:text-warning';
+                        break;
+                    case 'Corte eléctrico':
+                    case 'Apagado':
+                    case 'Dañado':
+                        stateClass = 'bg-danger-light text-danger-dark dark:bg-danger/20 dark:text-danger';
+                        break;
+                    case 'En mantenimiento':
+                        stateClass = 'bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-300';
+                        break;
+                    default:
+                        stateClass = 'bg-secondary-100 text-secondary-800 dark:bg-secondary-700 dark:text-secondary-300';
+                }
+                
+                row.innerHTML = `
+                    <td class="px-4 py-3 text-sm text-secondary-900 dark:text-secondary-200">
+                        ${report.terminal || '<span class="text-secondary-400 italic">No especificado</span>'}
+                    </td>
+                    <td class="px-4 py-3 text-sm text-secondary-900 dark:text-secondary-200">
+                        ${report.tipo_poste || '<span class="text-secondary-400 italic">No especificado</span>'}
+                    </td>
+                    <td class="px-4 py-3 text-sm">
+                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-medium rounded-full ${stateClass}">
+                            ${report.estado || 'No especificado'}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-secondary-900 dark:text-secondary-200">
+                        ${formattedDate}
+                    </td>
+                    <td class="px-4 py-3 text-sm font-mono text-secondary-900 dark:text-secondary-200">
+                        ${lat}, ${lon}
+                    </td>
+                    <td class="px-4 py-3 text-sm text-right">
+                        <button data-id="${report.id}" class="detail-btn text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 font-medium">
+                            <i class="ti ti-eye mr-1"></i> Ver
+                        </button>
+                    </td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+            
+            // Añadir event listeners a los botones de detalle
+            document.querySelectorAll('.detail-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = parseInt(btn.dataset.id);
+                    const report = AppState.inspections.find(i => i.id === id);
+                    if (report) {
+                        showDetailModal(report);
+                    }
+                });
+            });
+        }
+        
+        function createPagination(totalItems, itemsPerPage, currentPage) {
+            const paginationContainer = document.getElementById('pagination-numbers');
+            if (!paginationContainer) return;
+            
+            // Limpiar contenedor
+            paginationContainer.innerHTML = '';
+            
+            // Calcular número total de páginas
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            if (totalPages <= 1) return;
+            
+            // Configurar botones de anterior/siguiente
+            const prevBtn = document.getElementById('prev-page');
+            const nextBtn = document.getElementById('next-page');
+            
+            prevBtn.disabled = currentPage === 1;
+            nextBtn.disabled = currentPage === totalPages;
+            
+            prevBtn.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    AppState.currentPage = currentPage - 1;
+                    updateReportsTable();
+                }
+            });
+            
+            nextBtn.addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    AppState.currentPage = currentPage + 1;
+                    updateReportsTable();
+                }
+            });
+            
+            // Crear páginas numéricas (máximo 5 números visibles)
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(totalPages, startPage + 4);
+            
+            if (endPage - startPage < 4) {
+                startPage = Math.max(1, endPage - 4);
+            }
+            
+            // Mostrar primera página si estamos lejos
+            if (startPage > 1) {
+                const pageBtn = document.createElement('button');
+                pageBtn.textContent = '1';
+                pageBtn.className = 'w-8 h-8 flex items-center justify-center rounded-md hover:bg-secondary-100 dark:hover:bg-secondary-700 transition-colors';
+                pageBtn.addEventListener('click', () => {
+                    AppState.currentPage = 1;
+                    updateReportsTable();
+                });
+                paginationContainer.appendChild(pageBtn);
+                
+                if (startPage > 2) {
+                    const ellipsis = document.createElement('span');
+                    ellipsis.textContent = '...';
+                    ellipsis.className = 'w-8 h-8 flex items-center justify-center text-secondary-400';
+                    paginationContainer.appendChild(ellipsis);
+                }
+            }
+            
+            // Páginas numéricas
+            for (let i = startPage; i <= endPage; i++) {
+                const pageBtn = document.createElement('button');
+                pageBtn.textContent = i;
+                pageBtn.className = `w-8 h-8 flex items-center justify-center rounded-md transition-colors ${
+                    i === currentPage 
+                    ? 'bg-primary-600 text-white' 
+                    : 'hover:bg-secondary-100 dark:hover:bg-secondary-700'
+                }`;
+                
+                pageBtn.addEventListener('click', () => {
+                    AppState.currentPage = i;
+                    updateReportsTable();
+                });
+                
+                paginationContainer.appendChild(pageBtn);
+            }
+            
+            // Mostrar última página si estamos lejos
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    const ellipsis = document.createElement('span');
+                    ellipsis.textContent = '...';
+                    ellipsis.className = 'w-8 h-8 flex items-center justify-center text-secondary-400';
+                    paginationContainer.appendChild(ellipsis);
+                }
+                
+                const pageBtn = document.createElement('button');
+                pageBtn.textContent = totalPages;
+                pageBtn.className = 'w-8 h-8 flex items-center justify-center rounded-md hover:bg-secondary-100 dark:hover:bg-secondary-700 transition-colors';
+                pageBtn.addEventListener('click', () => {
+                    AppState.currentPage = totalPages;
+                    updateReportsTable();
+                });
+                paginationContainer.appendChild(pageBtn);
+            }
+        }
+        
+        function initTableFiltering() {
+            const searchInput = document.getElementById('search-table');
+            if (!searchInput) return;
+            
+            // Debounce para la búsqueda
+            let searchTimeout;
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    applyFilters();
+                }, 300);
+            });
+        }
+        
+        // Lógica del formulario
+        function initForm() {
+            const form = document.getElementById('inspectionForm');
+            const estadoSelect = document.getElementById('estado');
+            const imageContainer = document.getElementById('imageUploadContainer');
+            const imageInput = document.getElementById('imageFile');
+            const imagePreview = document.getElementById('image-preview');
+            const uploadIcon = document.getElementById('upload-icon');
+            const resetBtn = document.getElementById('reset-form-btn');
+            const refreshLocationBtn = document.getElementById('refresh-location');
+            
+            // Mostrar/ocultar sección de imagen según el estado
+            estadoSelect.addEventListener('change', () => {
+                imageContainer.classList.toggle('hidden', estadoSelect.value === 'Bueno');
+            });
+            
+            // Previsualización de imagen
+            imageInput.addEventListener('change', () => {
+                const file = imageInput.files[0];
+                if (file) {
+                    imagePreview.src = URL.createObjectURL(file);
+                    imagePreview.classList.remove('hidden');
+                    uploadIcon.classList.add('hidden');
+                } else {
+                    imagePreview.classList.add('hidden');
+                    uploadIcon.classList.remove('hidden');
+                }
+            });
+            
+            // Drag and drop para imágenes
+            const dropArea = imageInput.closest('.border-dashed');
+            if (dropArea) {
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    dropArea.addEventListener(eventName, preventDefaults, false);
+                });
+                
+                function preventDefaults(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    dropArea.addEventListener(eventName, () => {
+                        dropArea.classList.add('border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/10');
+                    }, false);
+                });
+                
+                ['dragleave', 'drop'].forEach(eventName => {
+                    dropArea.addEventListener(eventName, () => {
+                        dropArea.classList.remove('border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/10');
+                    }, false);
+                });
+                
+                dropArea.addEventListener('drop', (e) => {
+                    const dt = e.dataTransfer;
+                    const files = dt.files;
+                    
+                    if (files.length) {
+                        imageInput.files = files;
+                        const event = new Event('change', { 'bubbles': true });
+                        imageInput.dispatchEvent(event);
+                    }
+                }, false);
+            }
+            
+            // Evento para restablecer formulario
+            if (resetBtn) {
+                resetBtn.addEventListener('click', () => {
+                    form.reset();
+                    imagePreview.classList.add('hidden');
+                    uploadIcon.classList.remove('hidden');
+                    imageContainer.classList.toggle('hidden', estadoSelect.value === 'Bueno');
+                });
+            }
+            
+            // Evento para refrescar ubicación
+            if (refreshLocationBtn) {
+                refreshLocationBtn.addEventListener('click', () => {
+                    requestGeolocation((position) => {
+                        const coords = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        
+                        if (AppState.maps.formMap && AppState.maps.formMarker) {
+                            AppState.maps.formMap.setView(coords, 18);
+                            AppState.maps.formMarker.setLatLng(coords);
+                            updateFormCoords(coords);
+                            
+                            // Actualizar la información de precisión
+                            const accuracyEl = document.getElementById('location-accuracy');
+                            if (accuracyEl) {
+                                const accuracy = Math.round(position.coords.accuracy);
+                                accuracyEl.textContent = `Precisión: ±${accuracy}m`;
+                                accuracyEl.className = `text-xs ${
+                                    accuracy <= 10 
+                                    ? 'text-success' 
+                                    : accuracy <= 50 
+                                    ? 'text-warning' 
+                                    : 'text-danger'
+                                }`;
+                            }
+                        }
+                    });
+                });
+            }
+            
+            // Inicializar mapa del formulario
+            initFormMap();
+            
+            // Manejar envío del formulario
+            form.addEventListener('submit', handleFormSubmit);
+        }
+        
+        function initFormMap() {
+            const mapEl = document.getElementById('formMap');
+            if (!mapEl) return;
+            
+            // Destruir mapa existente si existe
+            if (AppState.maps.formMap) {
+                AppState.maps.formMap.remove();
+                AppState.maps.formMap = null;
+            }
+            
+            // Coordenadas iniciales (usar ubicación actual o por defecto)
+            let initialCoords = AppState.currentLocation 
+                ? [AppState.currentLocation.latitude, AppState.currentLocation.longitude] 
+                : DEFAULT_COORDS;
+            
+            // Crear mapa
+            AppState.maps.formMap = L.map(mapEl, {
+                zoomControl: false,
+                attributionControl: false
+            }).setView(initialCoords, 17);
+            
+            // Añadir controles
+            L.control.zoom({
+                position: 'topright'
+            }).addTo(AppState.maps.formMap);
+            
+            // Añadir atribución
+            L.control.attribution({
+                position: 'bottomleft',
+                prefix: false
+            }).addTo(AppState.maps.formMap).addAttribution(MAP_TILES[AppState.mapStyle].attribution);
+            
+            // Añadir capa de mapa
+            L.tileLayer(MAP_TILES[AppState.mapStyle].url, {
+                maxZoom: 19
+            }).addTo(AppState.maps.formMap);
+            
+            // Crear marcador arrastrable
+            const icon = L.divIcon({
+                html: `<div class="flex items-center justify-center w-full h-full rounded-full bg-primary-500 border-4 border-white dark:border-secondary-800 shadow-lg pulse-animation">
+                        <i class="ti ti-bulb text-white"></i>
+                      </div>`,
+                className: 'custom-div-icon',
+                iconSize: [36, 36],
+                iconAnchor: [18, 18]
+            });
+            
+            AppState.maps.formMarker = L.marker(initialCoords, { 
+                icon,
+                draggable: true 
+            }).addTo(AppState.maps.formMap);
+            
+            // Actualizar coordenadas al arrastrar
+            AppState.maps.formMarker.on('dragend', (e) => {
+                updateFormCoords(e.target.getLatLng());
+            });
+            
+            // Actualizar coordenadas iniciales
+            updateFormCoords({
+                lat: initialCoords[0],
+                lng: initialCoords[1]
+            });
+            
+            // Iniciar geolocalización
+            startGeolocationWatcher();
+        }
+        
+        function updateFormCoords(coords) {
+            // Actualizar campos ocultos
+            document.getElementById('latitude').value = coords.lat.toFixed(8);
+            document.getElementById('longitude').value = coords.lng.toFixed(8);
+        }
+        
+        function startGeolocationWatcher() {
+            if (!navigator.geolocation) {
+                toast.show('Tu navegador no soporta geolocalización', 'warning');
+                return;
+            }
+            
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 30000
+            };
+            
+            const locationAccuracy = document.getElementById('location-accuracy');
+            
             navigator.geolocation.watchPosition(
                 (position) => {
-                    const userCoords = [position.coords.latitude, position.coords.longitude];
-                    if (!isMapInitialized) {
-                        initializeMap(userCoords);
-                    } else {
-                        const newLatLng = new L.LatLng(userCoords[0], userCoords[1]);
-                        userMarker.setLatLng(newLatLng);
-                        map.panTo(newLatLng);
-                        latInput.value = userCoords[0];
-                        lonInput.value = userCoords[1];
+                    // Guardar posición actual
+                    AppState.currentLocation = {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        accuracy: position.coords.accuracy
+                    };
+                    
+                    // Actualizar mapa del formulario si está activo
+                    if (AppState.currentView === 'form' && AppState.maps.formMap && AppState.maps.formMarker) {
+                        const coords = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        
+                        AppState.maps.formMap.setView(coords);
+                        AppState.maps.formMarker.setLatLng(coords);
+                        updateFormCoords(coords);
+                    }
+                    
+                    // Actualizar indicador de precisión
+                    if (locationAccuracy) {
+                        const accuracy = Math.round(position.coords.accuracy);
+                        locationAccuracy.textContent = `Precisión: ±${accuracy}m`;
+                        locationAccuracy.className = `text-xs ${
+                            accuracy <= 10 
+                            ? 'text-success' 
+                            : accuracy <= 50 
+                            ? 'text-warning' 
+                            : 'text-danger'
+                        }`;
                     }
                 },
-                () => {
-                    if (!isMapInitialized) {
-                        initializeMap(defaultCoords);
-                        showMessage('Geolocalización Falló', 'No se pudo obtener tu ubicación. Se usará una por defecto. Arrastra el pin al lugar correcto.', 'warning');
+                (error) => {
+                    console.warn(`Error de geolocalización (${error.code}): ${error.message}`);
+                    
+                    // Mostrar mensaje según el tipo de error
+                    let message;
+                    switch (error.code) {
+                        case error.PERMISSION_DENIED:
+                            message = 'Acceso a la ubicación denegado';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            message = 'Información de ubicación no disponible';
+                            break;
+                        case error.TIMEOUT:
+                            message = 'Tiempo de espera agotado';
+                            break;
+                        default:
+                            message = 'Error desconocido';
                     }
+                    
+                    toast.show(message, 'warning');
                 },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                options
             );
-        } else {
-            initializeMap(defaultCoords);
-            showMessage('Geolocalización no Soportada', 'Tu navegador no soporta geolocalización. Arrastra el pin al lugar correcto.', 'warning');
         }
-
-        // --- LÓGICA DEL FORMULARIO ---
-        statusSelect.addEventListener('change', (e) => {
-            imageUploadContainer.classList.toggle('hidden', e.target.value !== 'Dañado');
-        });
-
-        form.addEventListener('submit', async (e) => {
+        
+        function requestGeolocation(callback) {
+            if (!navigator.geolocation) {
+                toast.show('Tu navegador no soporta geolocalización', 'warning');
+                return;
+            }
+            
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            };
+            
+            toast.show('Obteniendo ubicación...', 'info');
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    // Guardar posición actual
+                    AppState.currentLocation = {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        accuracy: position.coords.accuracy
+                    };
+                    
+                    // Ejecutar callback
+                    if (typeof callback === 'function') {
+                        callback(position);
+                    }
+                    
+                    toast.show('Ubicación actualizada', 'success');
+                },
+                (error) => {
+                    console.warn(`Error de geolocalización (${error.code}): ${error.message}`);
+                    
+                    // Mostrar mensaje según el tipo de error
+                    let message;
+                    switch (error.code) {
+                        case error.PERMISSION_DENIED:
+                            message = 'Acceso a la ubicación denegado';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            message = 'Información de ubicación no disponible';
+                            break;
+                        case error.TIMEOUT:
+                            message = 'Tiempo de espera agotado';
+                            break;
+                        default:
+                            message = 'Error desconocido';
+                    }
+                    
+                    toast.show(message, 'error');
+                },
+                options
+            );
+        }
+        
+        async function handleFormSubmit(e) {
             e.preventDefault();
-            setLoading(true);
-
+            
+            // Validar formulario
+            const form = e.target;
             const formData = new FormData(form);
+            
+            // Verificar campos requeridos
+            const terminal = formData.get('terminal');
+            const tipo_poste = formData.get('tipo_poste');
+            const estado = formData.get('estado');
+            const latitude = formData.get('latitude');
+            const longitude = formData.get('longitude');
+            
+            if (!terminal || !tipo_poste || !estado || !latitude || !longitude) {
+                toast.show('Por favor complete todos los campos requeridos', 'error');
+                return;
+            }
+            
+            // Verificar formato de coordenadas
+            if (isNaN(parseFloat(latitude)) || isNaN(parseFloat(longitude))) {
+                toast.show('Coordenadas inválidas. Intente refrescar la ubicación', 'error');
+                return;
+            }
+            
+            // Iniciar carga
+            setLoading(true);
+            
+            // Preparar datos
             const dataToInsert = {
-                luminaire_id: formData.get('luminaireId'),
-                status: formData.get('status'),
-                notes: formData.get('notes'),
-                latitude: parseFloat(formData.get('latitude')),
-                longitude: parseFloat(formData.get('longitude')),
+                terminal: terminal,
+                tipo_poste: tipo_poste,
+                estado: estado,
+                observacion: formData.get('observacion'),
+                latitude: parseFloat(latitude),
+                longitude: parseFloat(longitude),
                 image_url: null
             };
-            const imageFile = imageFileInput.files[0];
             
             try {
-                if (dataToInsert.status === 'Dañado' && imageFile) {
-                    const fileExt = imageFile.name.split('.').pop();
-                    const fileName = `${dataToInsert.luminaire_id.replace(/\s+/g, '_')}-${Date.now()}.${fileExt}`;
+                const imageFile = formData.get('imageFile');
+                
+                // Subir imagen si existe
+                if (imageFile && imageFile.size > 0) {
+                    // Validar tamaño (5MB máximo)
+                    if (imageFile.size > 5 * 1024 * 1024) {
+                        toast.show('La imagen excede el tamaño máximo de 5MB', 'error');
+                        setLoading(false);
+                        return;
+                    }
                     
-                    const { error: uploadError } = await dbClient.storage
+                    // Generar nombre único
+                    const fileName = `${Date.now()}-${imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+                    
+                    // Subir archivo
+                    const { data: uploadData, error: uploadError } = await dbClient.storage
                         .from('luminaria')
                         .upload(fileName, imageFile);
+                    
                     if (uploadError) throw uploadError;
                     
-                    const { data: publicUrlData } = dbClient.storage
+                    // Obtener URL pública
+                    const { data: urlData } = dbClient.storage
                         .from('luminaria')
                         .getPublicUrl(fileName);
-                    dataToInsert.image_url = publicUrlData.publicUrl;
+                    
+                    dataToInsert.image_url = urlData.publicUrl;
                 }
-
-                const { error: insertError } = await dbClient.from('inspections').insert([dataToInsert]);
-                if (insertError) throw insertError;
                 
-                showMessage('Éxito', 'El reporte ha sido enviado correctamente.', 'success');
+                // Insertar en base de datos
+                const { error } = await dbClient.from('levantamiento_luminaria').insert([dataToInsert]);
+                
+                if (error) throw error;
+                
+                // Mostrar mensaje de éxito
+                toast.show('Reporte enviado con éxito', 'success');
+                
+                // Limpiar formulario
                 form.reset();
-                imageUploadContainer.classList.add('hidden');
-
+                
+                // Resetear imagen
+                const imagePreview = document.getElementById('image-preview');
+                const uploadIcon = document.getElementById('upload-icon');
+                if (imagePreview && uploadIcon) {
+                    imagePreview.classList.add('hidden');
+                    uploadIcon.classList.remove('hidden');
+                }
+                
+                // Ocultar sección de imagen
+                const imageContainer = document.getElementById('imageUploadContainer');
+                if (imageContainer) {
+                    imageContainer.classList.add('hidden');
+                }
+                
             } catch (error) {
-                console.error('Error en el proceso:', error);
-                showMessage('Error', error.message, 'error');
+                console.error('Error al enviar:', error);
+                toast.show(`Error: ${error.message || 'No se pudo enviar el reporte'}`, 'error');
             } finally {
                 setLoading(false);
             }
-        });
-        
-        // --- CARGAR Y SUSCRIBIRSE A REPORTES (TIEMPO REAL) ---
-        function subscribeToReports() {
-            dbClient
-              .channel('public:inspections')
-              .on('postgres_changes', { event: '*', schema: 'public', table: 'inspections' }, payload => {
-                console.log('Change received!', payload);
-                handleRealtimeChange(payload);
-              })
-              .subscribe();
-            
-            // Carga inicial de datos
-            loadInitialReports();
         }
         
-        async function loadInitialReports() {
-            const { data, error } = await dbClient
-                .from('inspections')
-                .select('id, luminaire_id, notes, latitude, longitude, status');
-            if (error) {
-                console.error('Error cargando reportes iniciales:', error);
-                return;
-            }
-            data.forEach(report => updateMapWithReport(report));
-        }
-        
-        function handleRealtimeChange(payload) {
-            const report = payload.new;
-            const reportId = report.id;
-
-            // Si el reporte es nuevo o actualizado y está dañado
-            if ((payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') && report.status === 'Dañado') {
-                updateMapWithReport(report);
-            } 
-            // Si el reporte se actualizó a un estado que no es "Dañado", o se eliminó
-            else if (reportMarkers[reportId]) {
-                map.removeLayer(reportMarkers[reportId]);
-                delete reportMarkers[reportId];
-            }
-        }
-
-        function updateMapWithReport(report) {
-            if (report.status !== 'Dañado' || !report.latitude || !report.longitude) {
-                // Si el reporte ya no está dañado y existe en el mapa, lo quitamos
-                if(reportMarkers[report.id]) {
-                    map.removeLayer(reportMarkers[report.id]);
-                    delete reportMarkers[report.id];
-                }
-                return;
-            }
-
-            const reportCoords = [report.latitude, report.longitude];
-            const popupContent = `<b>ID: ${report.luminaire_id}</b><br>${report.notes || 'Sin notas.'}`;
-            
-            // Si el marcador ya existe, solo actualizamos su popup
-            if (reportMarkers[report.id]) {
-                reportMarkers[report.id].setLatLng(reportCoords).setPopupContent(popupContent);
-            } else {
-                // Si es nuevo, lo creamos
-                const reportIcon = L.icon({
-                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                    iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-                });
-                
-                const newMarker = L.marker(reportCoords, { icon: reportIcon })
-                    .addTo(map)
-                    .bindPopup(popupContent);
-                
-                reportMarkers[report.id] = newMarker;
-            }
-        }
-
-        // --- FUNCIONES AUXILIARES ---
         function setLoading(isLoading) {
-            submitButton.disabled = isLoading;
-            buttonText.classList.toggle('hidden', isLoading);
-            loader.classList.toggle('hidden', !isLoading);
+            const submitButton = document.getElementById('submitButton');
+            if (submitButton) {
+                submitButton.disabled = isLoading;
+                submitButton.querySelector('#buttonText').classList.toggle('hidden', isLoading);
+                submitButton.querySelector('#loader').classList.toggle('hidden', !isLoading);
+            }
         }
         
-        function showMessage(title, message, type = 'info') {
-            const modal = document.getElementById('messageModal');
-            const modalTitle = document.getElementById('modalTitle');
-            const modalMessage = document.getElementById('modalMessage');
-            const modalIcon = document.getElementById('modalIcon');
-            const closeModalButton = document.getElementById('closeModalButton');
-
-            modalTitle.textContent = title;
-            modalMessage.textContent = message;
-
-            modalIcon.innerHTML = '';
-            modalIcon.className = 'mx-auto flex items-center justify-center h-12 w-12 rounded-full'; // Reset classes
+        // Gestión modal de detalles
+        function showDetailModal(report) {
+            // Actualizar imagen
+            const detailImage = document.getElementById('detail-image');
+            const noImagePlaceholder = document.getElementById('detail-no-image');
             
-            const icons = {
-                success: {
-                    svg: `<svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>`,
-                    bg: 'bg-green-100'
-                },
-                error: {
-                    svg: `<svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>`,
-                    bg: 'bg-red-100'
-                },
-                warning: {
-                    svg: `<svg class="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>`,
-                    bg: 'bg-yellow-100'
-                }
+            if (report.image_url) {
+                detailImage.src = report.image_url;
+                detailImage.classList.remove('hidden');
+                noImagePlaceholder.classList.add('hidden');
+            } else {
+                detailImage.classList.add('hidden');
+                noImagePlaceholder.classList.remove('hidden');
+            }
+            
+            // Formatear coordenadas
+            const lat = report.latitude ? parseFloat(report.latitude).toFixed(6) : 'N/A';
+            const lon = report.longitude ? parseFloat(report.longitude).toFixed(6) : 'N/A';
+            
+            // Formatear fecha
+            const formattedDate = new Date(report.created_at).toLocaleString('es-CL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            
+            // Actualizar botón para abrir en Google Maps
+            const openMapsBtn = document.getElementById('detail-open-maps');
+            if (report.latitude && report.longitude) {
+                openMapsBtn.classList.remove('hidden');
+                openMapsBtn.onclick = () => {
+                    window.open(`https://www.google.com/maps?q=${report.latitude},${report.longitude}`, '_blank');
+                };
+            } else {
+                openMapsBtn.classList.add('hidden');
+            }
+            
+            // Actualizar resumen
+            let stateClass;
+            switch (report.estado) {
+                case 'Bueno':
+                    stateClass = 'text-success';
+                    break;
+                case 'Mal direccionado':
+                case 'Falla intermitente':
+                    stateClass = 'text-warning';
+                    break;
+                case 'Corte eléctrico':
+                case 'Apagado':
+                case 'Dañado':
+                    stateClass = 'text-danger';
+                    break;
+                case 'En mantenimiento':
+                    stateClass = 'text-primary-600 dark:text-primary-400';
+                    break;
+                default:
+                    stateClass = 'text-secondary-600 dark:text-secondary-400';
+            }
+            
+            document.getElementById('detail-summary').innerHTML = `
+                <p class="grid grid-cols-[120px_1fr] gap-2 items-start">
+                    <span class="text-secondary-500 dark:text-secondary-400">Terminal:</span>
+                    <span>${report.terminal || '<span class="italic text-secondary-400">No especificado</span>'}</span>
+                </p>
+                <p class="grid grid-cols-[120px_1fr] gap-2 items-start">
+                    <span class="text-secondary-500 dark:text-secondary-400">Tipo de Poste:</span>
+                    <span>${report.tipo_poste || '<span class="italic text-secondary-400">No especificado</span>'}</span>
+                </p>
+                <p class="grid grid-cols-[120px_1fr] gap-2 items-start">
+                    <span class="text-secondary-500 dark:text-secondary-400">Estado:</span>
+                    <span class="font-medium ${stateClass}">${report.estado || '<span class="italic text-secondary-400">No especificado</span>'}</span>
+                </p>
+                <p class="grid grid-cols-[120px_1fr] gap-2 items-start">
+                    <span class="text-secondary-500 dark:text-secondary-400">Fecha:</span>
+                    <span>${formattedDate}</span>
+                </p>
+                <p class="grid grid-cols-[120px_1fr] gap-2 items-start">
+                    <span class="text-secondary-500 dark:text-secondary-400">Coordenadas:</span>
+                    <span class="font-mono">${lat}, ${lon}</span>
+                </p>
+                <p class="grid grid-cols-[120px_1fr] gap-2 items-start">
+                    <span class="text-secondary-500 dark:text-secondary-400">Observación:</span>
+                    <span>${report.observacion || '<span class="italic text-secondary-400">Sin observaciones</span>'}</span>
+                </p>
+            `;
+            
+            // Inicializar mapa de detalle
+            if (report.latitude && report.longitude) {
+                setTimeout(() => {
+                    // Destruir mapa existente
+                    if (AppState.maps.detailMap) {
+                        AppState.maps.detailMap.remove();
+                        AppState.maps.detailMap = null;
+                    }
+                    
+                    // Crear nuevo mapa
+                    AppState.maps.detailMap = L.map('detailMap', {
+                        zoomControl: false,
+                        attributionControl: false
+                    }).setView([report.latitude, report.longitude], 17);
+                    
+                    // Añadir controles
+                    L.control.zoom({
+                        position: 'topright'
+                    }).addTo(AppState.maps.detailMap);
+                    
+                    // Añadir atribución
+                    L.control.attribution({
+                        position: 'bottomleft',
+                        prefix: false
+                    }).addTo(AppState.maps.detailMap).addAttribution(MAP_TILES[AppState.mapStyle].attribution);
+                    
+                    // Añadir capa de mapa
+                    L.tileLayer(MAP_TILES[AppState.mapStyle].url, {
+                        maxZoom: 19
+                    }).addTo(AppState.maps.detailMap);
+                    
+                    // Añadir marcador
+                    const icon = L.divIcon({
+                        html: `<i class="ti ti-bulb text-primary-600 dark:text-primary-400"></i>`,
+                        className: 'bg-white dark:bg-secondary-800 shadow-md rounded-full w-8 h-8 flex items-center justify-center border-2 border-primary-500 dark:border-primary-700',
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16]
+                    });
+                    
+                    L.marker([report.latitude, report.longitude], { icon }).addTo(AppState.maps.detailMap);
+                }, 300);
+            }
+            
+            // Configurar exportación
+            document.getElementById('detail-export-btn').onclick = () => {
+                exportSingleInspection(report);
             };
-
-            const selectedIcon = icons[type] || icons.warning;
-            modalIcon.classList.add(selectedIcon.bg);
-            modalIcon.innerHTML = selectedIcon.svg;
             
-            modal.classList.remove('hidden');
-            closeModalButton.onclick = () => modal.classList.add('hidden');
+            // Mostrar modal
+            showModal('detail-modal');
+            
+            // Configurar cierre
+            document.getElementById('close-modal-btn').onclick = () => hideModal('detail-modal');
+            document.getElementById('close-detail-btn').onclick = () => hideModal('detail-modal');
         }
+        
+        function exportSingleInspection(inspection) {
+            exportDataToExcel([inspection], `luminaria_${inspection.id}`);
+        }
+        
+        function exportDataToExcel(data, filename) {
+            // Crear una copia limpia de los datos
+            const cleanData = data.map(item => {
+                // Formatear fecha
+                const date = new Date(item.created_at);
+                const formattedDate = date.toLocaleString('es-CL');
+                
+                // Retornar objeto limpio
+                return {
+                    'ID': item.id,
+                    'Terminal': item.terminal || 'No especificado',
+                    'Tipo de Poste': item.tipo_poste || 'No especificado',
+                    'Estado': item.estado || 'No especificado',
+                    'Observación': item.observacion || '',
+                    'Latitud': item.latitude ? parseFloat(item.latitude).toFixed(8) : 'N/A',
+                    'Longitud': item.longitude ? parseFloat(item.longitude).toFixed(8) : 'N/A',
+                    'Fecha de Registro': formattedDate,
+                    'URL de Imagen': item.image_url || 'Sin imagen'
+                };
+            });
+            
+            // Crear libro y hoja
+            const ws = XLSX.utils.json_to_sheet(cleanData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Inspecciones');
+            
+            // Ajustar ancho de columnas (estimado según el contenido)
+            const columnWidths = [
+                { wch: 5 },   // ID
+                { wch: 15 },  // Terminal
+                { wch: 25 },  // Tipo de Poste
+                { wch: 15 },  // Estado
+                { wch: 30 },  // Observación
+                { wch: 12 },  // Latitud
+                { wch: 12 },  // Longitud
+                { wch: 20 },  // Fecha
+                { wch: 50 }   // URL
+            ];
+            
+            ws['!cols'] = columnWidths;
+            
+            // Exportar
+            XLSX.writeFile(wb, `${filename}.xlsx`);
+        }
+        
+        // Consulta de datos y tiempo real
+        async function fetchInitialData() {
+            try {
+                // Mostrar loader
+                appLoader.style.opacity = '1';
+                appLoader.style.visibility = 'visible';
+                
+                // Verificar configuración
+                if (SUPABASE_URL.includes('TU_PROYECTO_URL') || SUPABASE_ANON_KEY.includes('TU_CLAVE_ANONIMA')) {
+                    showModal('config-warning');
+                    document.getElementById('close-config-warning').addEventListener('click', () => {
+                        hideModal('config-warning');
+                    });
+                    return;
+                }
+                
+                // Crear cliente de Supabase
+                const { createClient } = supabase;
+                const dbClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                
+                // Consultar datos
+                const { data, error } = await dbClient.from('levantamiento_luminaria').select('*').order('created_at', { ascending: false });
+                
+                if (error) throw error;
+                
+                // Guardar datos
+                AppState.inspections = data || [];
+                AppState.filteredInspections = [...AppState.inspections];
+                
+                // Cargar preferencias guardadas
+                AppState.mapStyle = localStorage.getItem('mapStyle') || 'satellite';
+                AppState.useCluster = localStorage.getItem('useCluster') !== 'false';
+                
+                // Mostrar vista inicial
+                const isMobile = window.innerWidth < 768;
+                const initialView = isMobile ? 'form' : 'dashboard';
+                
+                // Inicializar componentes
+                themeManager.init();
+                
+                // Configurar suscripción a cambios en tiempo real
+                setupRealtimeSubscription(dbClient);
+                
+                // Iniciar geolocalización
+                requestGeolocation();
+                
+                // Mostrar la aplicación
+                switchView(initialView);
+                
+                // Ocultar loader
+                setTimeout(() => {
+                    appLoader.style.opacity = '0';
+                    setTimeout(() => {
+                        appLoader.style.visibility = 'hidden';
+                        appContainer.classList.remove('hidden');
+                        // --- SOLUCIÓN: Forzar el resize y centrado del mapa tras mostrar el contenedor principal ---
+                        setTimeout(() => {
+                            if (AppState.currentView === 'dashboard' && AppState.maps.dashboardMap) {
+                                AppState.maps.dashboardMap.invalidateSize();
+                                AppState.maps.dashboardMap.setView(DEFAULT_COORDS, 11);
+                            }
+                        }, 350);
+                    }, 500);
+                }, 1000);
+                
+            } catch (error) {
+                console.error('Error al cargar datos iniciales:', error);
+                
+                // Mostrar mensaje de error
+                appLoader.innerHTML = `
+                    <div class="text-center p-6">
+                        <div class="text-danger mb-4">
+                            <i class="ti ti-alert-circle text-5xl"></i>
+                        </div>
+                        <h2 class="text-xl font-semibold mb-2">Error al cargar la aplicación</h2>
+                        <p class="text-secondary-500 dark:text-secondary-400 mb-4">${error.message || 'No se pudieron cargar los datos'}</p>
+                        <button id="retry-btn" class="px-4 py-2 bg-primary-600 text-white rounded-md text-sm hover:bg-primary-700 focus:outline-none">
+                            Reintentar
+                        </button>
+                    </div>
+                `;
+                
+                document.getElementById('retry-btn').addEventListener('click', () => {
+                    window.location.reload();
+                });
+            }
+        }
+        
+        function setupRealtimeSubscription(dbClient) {
+            dbClient.channel('public:levantamiento_luminaria')
+                .on('postgres_changes', { 
+                    event: '*', 
+                    schema: 'public', 
+                    table: 'levantamiento_luminaria' 
+                }, (payload) => {
+                    // Manejar cambios en tiempo real
+                    if (payload.eventType === 'INSERT') {
+                        // Nuevo registro
+                        AppState.inspections.unshift(payload.new);
+                        toast.show('Nuevo registro recibido', 'info');
+                    } else if (payload.eventType === 'UPDATE') {
+                        // Actualización
+                        const index = AppState.inspections.findIndex(i => i.id === payload.new.id);
+                        if (index > -1) {
+                            AppState.inspections[index] = payload.new;
+                        }
+                    } else if (payload.eventType === 'DELETE') {
+                        // Eliminación
+                        AppState.inspections = AppState.inspections.filter(i => i.id !== payload.old.id);
+                    }
+                    
+                    // Actualizar vista actual
+                    if (AppState.currentView === 'dashboard') {
+                        applyFilters();
+                    }
+                })
+                .subscribe();
+        }
+        
+        // --- INICIO DE LA APLICACIÓN ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Iniciar la aplicación
+            fetchInitialData();
+            
+            // Configurar eventos globales
+            window.addEventListener('resize', () => {
+                if (AppState.maps.dashboardMap) {
+                    AppState.maps.dashboardMap.invalidateSize();
+                }
+                if (AppState.maps.formMap) {
+                    AppState.maps.formMap.invalidateSize();
+                }
+                if (AppState.maps.detailMap) {
+                    AppState.maps.detailMap.invalidateSize();
+                }
+            });
+            
+            // Navegación
+            document.getElementById('nav-dashboard').addEventListener('click', () => switchView('dashboard'));
+            document.getElementById('nav-form').addEventListener('click', () => switchView('form'));
+        });
     </script>
 </body>
 </html>
