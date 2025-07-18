@@ -387,7 +387,8 @@
         }
         /* MODAL DE DETALLE SIEMPRE ARRIBA */
         #detail-modal, #detail-modal .modal-overlay, #detail-modal .modal-content {
-            z-index: 12000 !important;
+            position: fixed !important;
+            z-index: 99999 !important;
         }
         @media (max-width: 600px) {
             .fullscreen-map-active {
@@ -397,35 +398,38 @@
         /* ... estilos existentes ... */
         .map-float-modal {
             position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
+            top: 10vh !important;
+            left: 50% !important;
             width: 100vw !important;
-            height: 100vh !important;
+            max-width: 600px !important;
+            height: 80vh !important;
             z-index: 13000 !important;
             background: #fff;
-            border-radius: 0 !important;
+            border-radius: 1.25rem !important;
             margin: 0 !important;
             padding: 0 !important;
-            box-shadow: none !important;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.18);
             display: flex !important;
             flex-direction: column;
+            transform: translateX(-50%);
             transition: opacity 0.3s;
+            overflow: hidden;
         }
         .map-float-modal .map-float-map {
-            width: 100vw !important;
-            height: 100vh !important;
-            min-height: 100vh !important;
-            min-width: 100vw !important;
+            width: 100% !important;
+            height: 100% !important;
+            min-height: 100% !important;
+            min-width: 100% !important;
             position: absolute !important;
             top: 0; left: 0;
             z-index: 13001;
-            border-radius: 0 !important;
+            border-radius: 1.25rem !important;
         }
         .map-float-modal .leaflet-control-attribution {
             display: none !important;
         }
         .map-float-exit-btn {
-            position: fixed;
+            position: absolute;
             top: 16px;
             right: 16px;
             z-index: 13010;
@@ -478,6 +482,62 @@
                 box-shadow: 0 2px 8px rgba(0,0,0,0.2);
                 cursor: pointer;
             }
+        }
+        /* ... estilos existentes ... */
+        .dashboard-map-float-modal {
+            position: fixed !important;
+            top: 10vh !important;
+            left: 50% !important;
+            width: 100vw !important;
+            max-width: 600px !important;
+            height: 80vh !important;
+            z-index: 13000 !important;
+            background: #fff;
+            border-radius: 1.25rem !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+            display: flex !important;
+            flex-direction: column;
+            transform: translateX(-50%);
+            transition: opacity 0.3s;
+            overflow: hidden;
+        }
+        .dashboard-map-float-modal .map-container,
+        .dashboard-map-float-modal #dashboardMap {
+            width: 100% !important;
+            height: 100% !important;
+            min-height: 100% !important;
+            min-width: 100% !important;
+            position: absolute !important;
+            top: 0; left: 0;
+            z-index: 13001;
+            border-radius: 1.25rem !important;
+        }
+        .dashboard-map-float-modal .leaflet-control-attribution {
+            display: none !important;
+        }
+        .dashboard-map-float-exit-btn {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            z-index: 13010;
+            background: rgba(0,0,0,0.7);
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            cursor: pointer;
+        }
+        #detail-modal, #detail-modal .modal-overlay, #detail-modal .modal-content {
+            position: fixed !important;
+            z-index: 99999 !important;
         }
     </style>
     <!-- Favicon para evitar error 404 -->
@@ -1830,7 +1890,7 @@
                     // Detecta móvil por user agent o tamaño de pantalla
                     const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent) || window.innerWidth <= 800;
                     if (isMobile) {
-                        openMapFloatModal();
+                        expandDashboardMapBlockMobile();
                         return;
                     }
                     // Desktop: pantalla completa real
@@ -2787,6 +2847,14 @@
             // Configurar cierre
             document.getElementById('close-modal-btn').onclick = () => hideModal('detail-modal');
             document.getElementById('close-detail-btn').onclick = () => hideModal('detail-modal');
+            // Mueve el modal al final del body para máxima prioridad visual
+            const detailModal = document.getElementById('detail-modal');
+            if (detailModal && detailModal.parentElement !== document.body) {
+                document.body.appendChild(detailModal);
+            }
+            // Forzar visibilidad y z-index
+            detailModal.style.zIndex = '99999';
+            detailModal.style.position = 'fixed';
         }
         
         function exportSingleInspection(inspection) {
@@ -3082,27 +3150,45 @@
         }
 
         // --- EXPANSIÓN DEL MAPA EN MÓVIL ---
-        function expandDashboardMapMobile() {
-            const mapBlock = document.getElementById('dashboardMap').parentElement;
-            mapBlock.classList.add('dashboard-map-expanded');
-            // Elimina cualquier botón de cerrar previo para evitar duplicados
-            let oldExitBtn = document.getElementById('dashboard-map-exit-btn');
-            if (oldExitBtn) oldExitBtn.remove();
+        let originalMapBlockParent = null;
+        let originalMapBlockNext = null;
+        function expandDashboardMapBlockMobile() {
+            const mapBlock = document.getElementById('dashboardMap').closest('.bg-white, .dark\\:bg-secondary-800');
+            if (!mapBlock) return;
+            // Si ya está expandido, no hacer nada
+            if (document.getElementById('dashboard-map-float-modal')) return;
+            // Guarda el lugar original
+            originalMapBlockParent = mapBlock.parentElement;
+            originalMapBlockNext = mapBlock.nextElementSibling;
+            // Crea el modal flotante
+            const modal = document.createElement('div');
+            modal.id = 'dashboard-map-float-modal';
+            modal.className = 'dashboard-map-float-modal';
             // Botón de cerrar
             const exitBtn = document.createElement('button');
-            exitBtn.id = 'dashboard-map-exit-btn';
-            exitBtn.className = 'dashboard-map-exit-btn';
+            exitBtn.className = 'dashboard-map-float-exit-btn';
             exitBtn.innerHTML = '<i class="ti ti-x"></i>';
             exitBtn.onclick = () => {
-                mapBlock.classList.remove('dashboard-map-expanded');
-                exitBtn.remove();
+                // Mueve el bloque de vuelta a su lugar original
+                if (originalMapBlockParent) {
+                    if (originalMapBlockNext) {
+                        originalMapBlockParent.insertBefore(mapBlock, originalMapBlockNext);
+                    } else {
+                        originalMapBlockParent.appendChild(mapBlock);
+                    }
+                }
+                mapBlock.classList.remove('dashboard-map-float-modal');
+                modal.remove();
                 setTimeout(() => {
                     if (AppState.maps.dashboardMap) {
                         AppState.maps.dashboardMap.invalidateSize();
                     }
                 }, 300);
             };
-            mapBlock.appendChild(exitBtn);
+            modal.appendChild(mapBlock);
+            modal.appendChild(exitBtn);
+            document.body.appendChild(modal);
+            mapBlock.classList.add('dashboard-map-float-modal');
             setTimeout(() => {
                 if (AppState.maps.dashboardMap) {
                     AppState.maps.dashboardMap.invalidateSize();
