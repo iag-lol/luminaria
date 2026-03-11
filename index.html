@@ -755,12 +755,12 @@
 
     <script>
         // Configuración de Supabase
-        const SUPABASE_URL = 'https://tcmtxvuucjttngcazgff.supabase.co'; 
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRjbXR4dnV1Y2p0dG5nY2F6Z2ZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA3MjUwMDEsImV4cCI6MjA1NjMwMTAwMX0.2WcIjMUEhSM6j9kYpbsYArQocZdHx86k7wXk-NyjIs0';
+        const SUPABASE_URL = 'https://kzslhhctjfxsdvcrqvvs.supabase.co'; 
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6c2xoaGN0amZ4c2R2Y3JxdnZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NDAzODQsImV4cCI6MjA4MTQxNjM4NH0.NQ1maFD5Nl8y-5TxJFjeSdhOSzOi-6Hd8o4VcrmLUKo';
         
         // --- SOLUCIÓN: Crear el cliente de Supabase global para todo el archivo ---
-        const { createClient } = supabase;
-        const dbClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const createClient = window.supabase?.createClient;
+        const dbClient = createClient ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
         
         /* ESTRUCTURA DE TABLA 'levantamiento_luminaria' RECOMENDADA:
          * id (int8, PK), created_at (timestamptz), terminal (text), tipo_poste (text),
@@ -784,6 +784,7 @@
             maps: {},
             mapStyle: 'satellite',
             useCluster: true,
+            offlineMode: false,
             filters: {
                 terminal: 'all',
                 estado: 'all',
@@ -795,6 +796,8 @@
             },
             currentLocation: null
         };
+        
+        const OFFLINE_STORAGE_KEY = 'luminaria_offline_inspections';
         
         // Constantes para la aplicación
         const TERMINALES = {
@@ -1264,23 +1267,98 @@
         function showModal(modalId) {
             const modal = document.getElementById(modalId);
             if (!modal) return;
+            const modalContent = modal.querySelector('.modal-content');
             
             modal.classList.remove('hidden');
             setTimeout(() => {
                 modal.classList.add('opacity-100');
-                modal.querySelector('.modal-content').classList.add('opacity-100', 'scale-100');
+                if (modalContent) {
+                    modalContent.classList.add('opacity-100', 'scale-100');
+                }
             }, 10);
         }
         
         function hideModal(modalId) {
             const modal = document.getElementById(modalId);
             if (!modal) return;
+            const modalContent = modal.querySelector('.modal-content');
             
             modal.classList.remove('opacity-100');
-            modal.querySelector('.modal-content').classList.remove('opacity-100', 'scale-100');
+            if (modalContent) {
+                modalContent.classList.remove('opacity-100', 'scale-100');
+            }
             setTimeout(() => {
                 modal.classList.add('hidden');
             }, 300);
+        }
+
+        function getOfflineInspections() {
+            try {
+                const stored = localStorage.getItem(OFFLINE_STORAGE_KEY);
+                const parsed = stored ? JSON.parse(stored) : [];
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (error) {
+                console.warn('No se pudieron leer los datos locales:', error);
+                return [];
+            }
+        }
+
+        function saveOfflineInspections(inspections) {
+            try {
+                localStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(inspections));
+            } catch (error) {
+                console.warn('No se pudieron guardar los datos locales:', error);
+            }
+        }
+
+        function showAppAndHideLoader() {
+            appLoader.style.opacity = '0';
+            setTimeout(() => {
+                appLoader.style.visibility = 'hidden';
+                appContainer.classList.remove('hidden');
+
+                setTimeout(() => {
+                    if (AppState.currentView === 'dashboard' && AppState.maps.dashboardMap) {
+                        AppState.maps.dashboardMap.invalidateSize();
+                        AppState.maps.dashboardMap.setView(DEFAULT_COORDS, 11);
+                    }
+                }, 350);
+            }, 500);
+        }
+
+        function initAppUi() {
+            AppState.mapStyle = localStorage.getItem('mapStyle') || 'satellite';
+            AppState.useCluster = localStorage.getItem('useCluster') !== 'false';
+
+            const isMobile = window.innerWidth < 768;
+            const initialView = isMobile ? 'form' : 'dashboard';
+
+            themeManager.init();
+            requestGeolocation();
+            switchView(initialView);
+        }
+
+        function isNetworkFetchError(error) {
+            const message = String(error?.message || '').toLowerCase();
+            return (
+                message.includes('failed to fetch') ||
+                message.includes('networkerror') ||
+                message.includes('load failed') ||
+                message.includes('err_name_not_resolved')
+            );
+        }
+
+        function enableOfflineMode(reasonMessage) {
+            AppState.offlineMode = true;
+            AppState.inspections = getOfflineInspections();
+            AppState.filteredInspections = [...AppState.inspections];
+            initAppUi();
+            showAppAndHideLoader();
+
+            const message = reasonMessage || 'Sin conexión a Supabase. La app funciona en modo local.';
+            setTimeout(() => {
+                toast.show(message, 'warning', 7000);
+            }, 200);
         }
         
         // Navegación de la aplicación
@@ -2593,6 +2671,22 @@
             );
         }
         
+        function resetFormAfterSubmit(form) {
+            form.reset();
+            
+            const imagePreview = document.getElementById('image-preview');
+            const uploadIcon = document.getElementById('upload-icon');
+            if (imagePreview && uploadIcon) {
+                imagePreview.classList.add('hidden');
+                uploadIcon.classList.remove('hidden');
+            }
+            
+            const imageContainer = document.getElementById('imageUploadContainer');
+            if (imageContainer) {
+                imageContainer.classList.add('hidden');
+            }
+        }
+
         async function handleFormSubmit(e) {
             e.preventDefault();
             
@@ -2634,6 +2728,33 @@
             
             try {
                 const imageFile = formData.get('imageFile');
+
+                if (AppState.offlineMode || !dbClient) {
+                    const skippedImageUpload = imageFile && imageFile.size > 0;
+
+                    const offlineInspection = {
+                        ...dataToInsert,
+                        id: `local-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+                        created_at: new Date().toISOString()
+                    };
+
+                    AppState.inspections.unshift(offlineInspection);
+                    AppState.filteredInspections = [...AppState.inspections];
+                    saveOfflineInspections(AppState.inspections);
+
+                    if (AppState.currentView === 'dashboard') {
+                        applyFilters();
+                    }
+
+                    toast.show(
+                        skippedImageUpload
+                            ? 'Reporte guardado localmente (imagen omitida en modo local).'
+                            : 'Reporte guardado localmente',
+                        skippedImageUpload ? 'warning' : 'success'
+                    );
+                    resetFormAfterSubmit(form);
+                    return;
+                }
                 
                 // Subir imagen si existe
                 if (imageFile && imageFile.size > 0) {
@@ -2671,21 +2792,7 @@
                 toast.show('Reporte enviado con éxito', 'success');
                 
                 // Limpiar formulario
-                form.reset();
-                
-                // Resetear imagen
-                const imagePreview = document.getElementById('image-preview');
-                const uploadIcon = document.getElementById('upload-icon');
-                if (imagePreview && uploadIcon) {
-                    imagePreview.classList.add('hidden');
-                    uploadIcon.classList.remove('hidden');
-                }
-                
-                // Ocultar sección de imagen
-                const imageContainer = document.getElementById('imageUploadContainer');
-                if (imageContainer) {
-                    imageContainer.classList.add('hidden');
-                }
+                resetFormAfterSubmit(form);
                 
             } catch (error) {
                 console.error('Error al enviar:', error);
@@ -2921,6 +3028,11 @@
                     });
                     return;
                 }
+
+                if (!dbClient) {
+                    enableOfflineMode('No se pudo inicializar Supabase. Ejecutando en modo local.');
+                    return;
+                }
                 
                 // Consultar datos
                 const { data, error } = await dbClient.from('levantamiento_luminaria').select('*').order('created_at', { ascending: false });
@@ -2930,44 +3042,21 @@
                 // Guardar datos
                 AppState.inspections = data || [];
                 AppState.filteredInspections = [...AppState.inspections];
-                
-                // Cargar preferencias guardadas
-                AppState.mapStyle = localStorage.getItem('mapStyle') || 'satellite';
-                AppState.useCluster = localStorage.getItem('useCluster') !== 'false';
-                
-                // Mostrar vista inicial
-                const isMobile = window.innerWidth < 768;
-                const initialView = isMobile ? 'form' : 'dashboard';
-                
-                // Inicializar componentes
-                themeManager.init();
-                
-                // Configurar suscripción a cambios en tiempo real
+
+                initAppUi();
                 setupRealtimeSubscription(dbClient);
-                
-                // Iniciar geolocalización
-                requestGeolocation();
-                
-                // Mostrar la aplicación
-                switchView(initialView);
-                
-                // Ocultar loader
+
                 setTimeout(() => {
-                    appLoader.style.opacity = '0';
-                    setTimeout(() => {
-                        appLoader.style.visibility = 'hidden';
-                        appContainer.classList.remove('hidden');
-                        // --- SOLUCIÓN: Forzar el resize y centrado del mapa tras mostrar el contenedor principal ---
-                        setTimeout(() => {
-                            if (AppState.currentView === 'dashboard' && AppState.maps.dashboardMap) {
-                                AppState.maps.dashboardMap.invalidateSize();
-                                AppState.maps.dashboardMap.setView(DEFAULT_COORDS, 11);
-                            }
-                        }, 350);
-                    }, 500);
+                    showAppAndHideLoader();
                 }, 1000);
                 
             } catch (error) {
+                if (isNetworkFetchError(error)) {
+                    console.warn('Conexión a Supabase no disponible:', error);
+                    enableOfflineMode('No se pudo conectar con Supabase. Ejecutando en modo local.');
+                    return;
+                }
+
                 console.error('Error al cargar datos iniciales:', error);
                 
                 // Mostrar mensaje de error
@@ -2991,6 +3080,7 @@
         }
         
         function setupRealtimeSubscription(dbClient) {
+            if (!dbClient || AppState.offlineMode) return;
             dbClient.channel('public:levantamiento_luminaria')
                 .on('postgres_changes', { 
                     event: '*', 
